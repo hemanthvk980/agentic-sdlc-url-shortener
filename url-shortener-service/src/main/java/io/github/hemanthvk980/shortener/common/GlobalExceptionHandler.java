@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -19,8 +21,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
-/** Every error is an RFC 7807 problem document; internal details never leak to clients. */
+/**
+ * Every error is an RFC 7807 problem document; internal details never leak to clients.
+ * Ordered first so these handlers win over Boot's ProblemDetailsExceptionHandler (enabled via
+ * spring.mvc.problemdetails), which still covers framework errors not handled here (405, 415, ...).
+ */
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
