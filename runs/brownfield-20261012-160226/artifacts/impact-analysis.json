@@ -1,0 +1,59 @@
+{
+  "summary": "Additive API change: new POST /api/v1/links/batch in LinkController delegating to a new transactional LinkService.createBatch that pre-validates with UrlValidator and reuses create(). New problem-detail mapping for batch validation errors. No schema change.",
+  "impactedFiles": [
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+      "why": "new batch handler"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+      "why": "new createBatch (all-or-nothing transaction)"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java",
+      "why": "map BatchValidationException to 400 with per-index errors"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/RateLimitFilter.java",
+      "why": "batch requests consume one token per request (review rate-limit semantics)"
+    }
+  ],
+  "newFiles": [
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java",
+      "why": "request DTO"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java",
+      "why": "response DTO"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java",
+      "why": "domain error carrying index → reason"
+    }
+  ],
+  "impactedApis": [
+    {
+      "method": "POST",
+      "path": "/api/v1/links/batch",
+      "change": "new",
+      "backwardCompatible": true
+    }
+  ],
+  "dataFlowChanges": [
+    "N inserts in one transaction; a failure rolls back the whole batch"
+  ],
+  "schemaChange": false,
+  "regressionRisks": [
+    {
+      "area": "single create",
+      "risk": "refactoring create() could change existing behaviour",
+      "testFocus": "existing LinkApiIntegrationTest must stay green; createBatch reuses create() unchanged"
+    },
+    {
+      "area": "rate limiting",
+      "risk": "one request now creates up to 50 links",
+      "testFocus": "document; consider weighting tokens by batch size"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "summary": "Greenfield: no existing source code, nothing to regress.",
+  "impactedFiles": [],
+  "newFiles": [],
+  "impactedApis": [],
+  "dataFlowChanges": [],
+  "schemaChange": true,
+  "regressionRisks": []
+}

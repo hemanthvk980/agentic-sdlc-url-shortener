@@ -1,0 +1,26 @@
+# Build output
+build/
+.gradle/
+out/
+*.class
+
+# Web
+web/node_modules/
+web/dist/
+web/.angular/
+url-shortener-service/src/main/resources/static/
+
+# Orchestrator: per-run git workspaces are nested repos; the evidence (reports, audit, patch) is committed
+runs/*/workspace/
+work/
+
+# Secrets
+.env
+*.env
+!.env.example
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

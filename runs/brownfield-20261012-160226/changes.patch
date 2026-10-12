@@ -1,0 +1,264 @@
+ url-shortener-service/CHANGELOG.md                 |  7 +++
+ url-shortener-service/README.md                    |  1 +
+ .../shortener/common/GlobalExceptionHandler.java   |  8 +++
+ .../shortener/link/api/BatchCreateRequest.java     | 10 ++++
+ .../shortener/link/api/BatchCreateResponse.java    |  7 +++
+ .../shortener/link/api/LinkController.java         | 13 +++++
+ .../link/service/BatchValidationException.java     | 19 +++++++
+ .../shortener/link/service/LinkService.java        | 27 +++++++++
+ .../link/api/BatchCreateIntegrationTest.java       | 66 ++++++++++++++++++++++
+ 9 files changed, 158 insertions(+)
+
+diff --git a/url-shortener-service/CHANGELOG.md b/url-shortener-service/CHANGELOG.md
+new file mode 100644
+index 0000000..83522c9
+--- /dev/null
++++ b/url-shortener-service/CHANGELOG.md
+@@ -0,0 +1,7 @@
++# Changelog
++
++## brownfield-20261012-160226
++
++Additive endpoint POST /api/v1/links/batch (1-50 entries). Validate every entry up front (collect index → reason), then insert all via the existing create() inside one transaction. 201 with links in request order; 400 problem detail with errors map; 409 if an alias is taken (whole batch rolled back).
++
++- `POST /api/v1/links/batch`
+diff --git a/url-shortener-service/README.md b/url-shortener-service/README.md
+index 0469e27..8b01fb6 100644
+--- a/url-shortener-service/README.md
++++ b/url-shortener-service/README.md
+@@ -22,6 +22,7 @@ DATABASE_USERNAME=shortener DATABASE_PASSWORD=shortener ./gradlew :url-shortener
+ | Method | Path | Description | Responses |
+ |---|---|---|---|
+ | `POST` | `/api/v1/links` | Create a link. Body: `{"url", "alias"?, "expiresAt"?}`. Optional `Idempotency-Key` header. | 201, 400, 409, 429 |
++| `POST` | `/api/v1/links/batch` | Create up to 50 links atomically. Body: `{"links": [{"url", "alias"?, "expiresAt"?}, ...]}`. If any entry is invalid, nothing is created and `errors` maps entry index → reason. | 201, 400, 409, 429 |
+ | `GET` | `/{code}` | Redirect to the target | 302, 404, 410 |
+ | `GET` | `/api/v1/links/{code}` | Link metadata | 200, 404 |
+ | `GET` | `/api/v1/links/{code}/stats` | Total clicks, clicks per day (30 days), top referrers | 200, 404 |
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java
+index 9597e43..afd6443 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java
+@@ -1,5 +1,6 @@
+ package io.github.hemanthvk980.shortener.common;
+ 
++import io.github.hemanthvk980.shortener.link.service.BatchValidationException;
+ import io.github.hemanthvk980.shortener.link.service.ConflictException;
+ import io.github.hemanthvk980.shortener.link.service.ForbiddenException;
+ import io.github.hemanthvk980.shortener.link.service.InvalidUrlException;
+@@ -40,6 +41,13 @@ public class GlobalExceptionHandler {
+         return problem(HttpStatus.BAD_REQUEST, "Invalid request", e.getMessage());
+     }
+ 
++    @ExceptionHandler(BatchValidationException.class)
++    ProblemDetail batchInvalid(BatchValidationException e) {
++        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Batch rejected", e.getMessage() + "; no links were created");
++        pd.setProperty("errors", e.errors());
++        return pd;
++    }
++
+     @ExceptionHandler(ConflictException.class)
+     ProblemDetail conflict(ConflictException e) {
+         return problem(HttpStatus.CONFLICT, "Conflict", e.getMessage());
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java
+new file mode 100644
+index 0000000..ca235ec
+--- /dev/null
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java
+@@ -0,0 +1,10 @@
++package io.github.hemanthvk980.shortener.link.api;
++
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Size;
++import java.util.List;
++
++/** Up to 50 links per request; each entry has the same shape and rules as a single create. */
++public record BatchCreateRequest(@NotNull @Size(min = 1, max = 50) List<@Valid @NotNull CreateLinkRequest> links) {
++}
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java
+new file mode 100644
+index 0000000..30c20f0
+--- /dev/null
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java
+@@ -0,0 +1,7 @@
++package io.github.hemanthvk980.shortener.link.api;
++
++import java.util.List;
++
++/** Created links, in the same order as the request entries. */
++public record BatchCreateResponse(List<LinkResponse> links) {
++}
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java
+index 5ef066b..8de0dc7 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java
+@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
+ import jakarta.validation.constraints.Pattern;
+ import jakarta.validation.constraints.Size;
+ import java.net.URI;
++import java.util.List;
++import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.validation.annotation.Validated;
+ import org.springframework.web.bind.annotation.DeleteMapping;
+@@ -47,6 +49,17 @@ public class LinkController {
+                 .body(LinkResponse.of(link, shortUrl));
+     }
+ 
++    @Operation(summary = "Create up to 50 links atomically (all or nothing)",
++            description = "Every entry is validated first; if any entry is invalid nothing is created and the response lists each failing index.")
++    @PostMapping("/batch")
++    public ResponseEntity<BatchCreateResponse> createBatch(@Valid @RequestBody BatchCreateRequest req) {
++        List<Link> created = service.createBatch(req.links().stream()
++                .map(l -> new CreateLinkCommand(l.url(), l.alias(), l.expiresAt(), null))
++                .toList());
++        return ResponseEntity.status(HttpStatus.CREATED).body(new BatchCreateResponse(
++                created.stream().map(l -> LinkResponse.of(l, service.shortUrl(l.getCode()))).toList()));
++    }
++
+     @Operation(summary = "Get link metadata")
+     @GetMapping("/{code}")
+     public LinkResponse get(@PathVariable @Pattern(regexp = "^[A-Za-z0-9_-]{4,32}$") String code) {
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java
+new file mode 100644
+index 0000000..84540a7
+--- /dev/null
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java
+@@ -0,0 +1,19 @@
++package io.github.hemanthvk980.shortener.link.service;
++
++import java.util.Map;
++
++/** One or more batch entries are invalid; maps entry index to the reason. Nothing was created. */
++public class BatchValidationException extends RuntimeException {
++    private static final long serialVersionUID = 1L;
++
++    private final transient Map<Integer, String> errors;
++
++    public BatchValidationException(Map<Integer, String> errors) {
++        super(errors.size() + " batch entr" + (errors.size() == 1 ? "y is" : "ies are") + " invalid");
++        this.errors = Map.copyOf(errors);
++    }
++
++    public Map<Integer, String> errors() {
++        return errors;
++    }
++}
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java
+index d87c574..f14bd8e 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java
+@@ -11,7 +11,11 @@ import java.time.Clock;
+ import java.time.Instant;
+ import java.time.LocalDate;
+ import java.time.ZoneOffset;
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.LinkedHashMap;
+ import java.util.List;
++import java.util.Map;
+ import java.util.Locale;
+ import java.util.Set;
+ import java.util.regex.Pattern;
+@@ -89,6 +93,29 @@ public class LinkService {
+         throw new IllegalStateException("could not allocate a unique code after " + props.maxCodeGenerationAttempts() + " attempts");
+     }
+ 
++    /**
++     * All-or-nothing batch: every entry is validated before anything is written and all inserts share
++     * one transaction, so a failure (including an alias conflict found on insert) leaves no partial batch.
++     */
++    @Transactional
++    public List<Link> createBatch(List<CreateLinkCommand> commands) {
++        Map<Integer, String> errors = new LinkedHashMap<>();
++        Set<String> aliases = new HashSet<>();
++        for (int i = 0; i < commands.size(); i++) {
++            CreateLinkCommand c = commands.get(i);
++            try {
++                validator.validateAndNormalize(c.url());
++                if (c.alias() != null && !aliases.add(c.alias())) errors.put(i, "duplicate alias within batch");
++            } catch (InvalidUrlException e) {
++                errors.put(i, e.getMessage());
++            }
++        }
++        if (!errors.isEmpty()) throw new BatchValidationException(errors);
++        List<Link> created = new ArrayList<>(commands.size());
++        for (CreateLinkCommand c : commands) created.add(create(c));
++        return created;
++    }
++
+     /** Redirect lookup (cached). Throws 404 for unknown codes and 410 for expired/disabled links. */
+     @Cacheable(cacheNames = CacheConfig.LINKS_BY_CODE, key = "#code")
+     @Transactional(readOnly = true)
+diff --git a/url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/BatchCreateIntegrationTest.java b/url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/BatchCreateIntegrationTest.java
+new file mode 100644
+index 0000000..1e66878
+--- /dev/null
++++ b/url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/BatchCreateIntegrationTest.java
+@@ -0,0 +1,66 @@
++package io.github.hemanthvk980.shortener.link.api;
++
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import java.util.UUID;
++import java.util.stream.Collectors;
++import java.util.stream.IntStream;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.MockMvc;
++
++@SpringBootTest(properties = {"app.base-url=https://sho.rt", "app.rate-limit.enabled=false"})
++@AutoConfigureMockMvc
++class BatchCreateIntegrationTest {
++
++    @Autowired MockMvc mvc;
++
++    private static String entry(String url, String alias) {
++        return alias == null ? "{\"url\":\"" + url + "\"}" : "{\"url\":\"" + url + "\",\"alias\":\"" + alias + "\"}";
++    }
++
++    @Test
++    void ac1_createsAllLinksInRequestOrder() throws Exception {
++        String a = "b-" + UUID.randomUUID().toString().substring(0, 8);
++        String body = "{\"links\":[" + entry("https://example.com/1", a) + "," + entry("https://example.com/2", null) + "]}";
++        mvc.perform(post("/api/v1/links/batch").contentType(MediaType.APPLICATION_JSON).content(body))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.links.length()").value(2))
++                .andExpect(jsonPath("$.links[0].code").value(a))
++                .andExpect(jsonPath("$.links[1].targetUrl").value("https://example.com/2"));
++    }
++
++    @Test
++    void ac2_oneInvalidEntryRejectsTheWholeBatch() throws Exception {
++        String a = "b-" + UUID.randomUUID().toString().substring(0, 8);
++        String body = "{\"links\":[" + entry("https://example.com/ok", a) + "," + entry("javascript:alert(1)", null) + "]}";
++        mvc.perform(post("/api/v1/links/batch").contentType(MediaType.APPLICATION_JSON).content(body))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errors.1").exists());
++        mvc.perform(get("/api/v1/links/" + a)).andExpect(status().isNotFound());
++    }
++
++    @Test
++    void ac3_duplicateAliasWithinBatchIsRejected() throws Exception {
++        String a = "b-" + UUID.randomUUID().toString().substring(0, 8);
++        String body = "{\"links\":[" + entry("https://example.com/x", a) + "," + entry("https://example.com/y", a) + "]}";
++        mvc.perform(post("/api/v1/links/batch").contentType(MediaType.APPLICATION_JSON).content(body))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.errors.1").value("duplicate alias within batch"));
++    }
++
++    @Test
++    void ac4_sizeLimitsAreEnforced() throws Exception {
++        String tooMany = IntStream.range(0, 51).mapToObj(i -> entry("https://example.com/" + i, null)).collect(Collectors.joining(","));
++        mvc.perform(post("/api/v1/links/batch").contentType(MediaType.APPLICATION_JSON).content("{\"links\":[" + tooMany + "]}"))
++                .andExpect(status().isBadRequest());
++        mvc.perform(post("/api/v1/links/batch").contentType(MediaType.APPLICATION_JSON).content("{\"links\":[]}"))
++                .andExpect(status().isBadRequest());
++    }
++}

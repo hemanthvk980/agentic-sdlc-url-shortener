@@ -1,0 +1,32 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec): one Docker web service + managed PostgreSQL.
+# New → Blueprint → select this repo. Set APP_BASE_URL to the service URL after the first deploy.
+# Check Render's current free-tier terms (free Postgres instances have historically expired after a period);
+# any PostgreSQL works — e.g. Neon — by setting DATABASE_URL / DATABASE_USERNAME / DATABASE_PASSWORD instead.
+services:
+  - type: web
+    name: url-shortener
+    runtime: docker
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: APP_BASE_URL
+        sync: false
+      - key: APP_ADMIN_API_KEY
+        generateValue: true
+      - key: DB_HOST
+        fromDatabase: { name: shortener-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: shortener-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: shortener-db, property: database }
+      - key: DATABASE_USERNAME
+        fromDatabase: { name: shortener-db, property: user }
+      - key: DATABASE_PASSWORD
+        fromDatabase: { name: shortener-db, property: password }
+
+databases:
+  - name: shortener-db
+    plan: free
+    databaseName: shortener

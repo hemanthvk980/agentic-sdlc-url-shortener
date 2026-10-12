@@ -1,0 +1,76 @@
+{
+  "problemStatement": "Add an atomic batch-create endpoint (1-50 URLs) to the existing links API with per-entry error reporting and no partial writes.",
+  "functionalRequirements": [
+    {
+      "id": "FR1",
+      "text": "POST /api/v1/links/batch accepts 1-50 entries with the same fields as single create."
+    },
+    {
+      "id": "FR2",
+      "text": "If any entry is invalid, no link is created and the response identifies each invalid entry by index."
+    },
+    {
+      "id": "FR3",
+      "text": "On success, links are returned in request order."
+    }
+  ],
+  "nonFunctionalRequirements": [
+    {
+      "id": "NFR1",
+      "category": "reliability",
+      "text": "No partial batches under any failure, including alias conflicts discovered on insert."
+    },
+    {
+      "id": "NFR2",
+      "category": "maintainability",
+      "text": "Single-create behaviour and tests unchanged."
+    }
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "given": "2 valid entries",
+      "when": "POST /api/v1/links/batch",
+      "then": "201 with 2 links in request order"
+    },
+    {
+      "id": "AC2",
+      "given": "a batch with one javascript: URL at index 1",
+      "when": "POST",
+      "then": "400 with errors[1] and the valid entry was not created"
+    },
+    {
+      "id": "AC3",
+      "given": "two entries with the same alias",
+      "when": "POST",
+      "then": "400 with errors[1] = duplicate alias"
+    },
+    {
+      "id": "AC4",
+      "given": "0 or 51 entries",
+      "when": "POST",
+      "then": "400"
+    }
+  ],
+  "ambiguities": [
+    {
+      "question": "Should batches support Idempotency-Key?",
+      "impact": "MEDIUM",
+      "proposedDefault": "Not in this increment; clients retry the whole batch.",
+      "resolution": ""
+    },
+    {
+      "question": "Should a batch count as 1 or N requests for rate limiting?",
+      "impact": "MEDIUM",
+      "proposedDefault": "1 request (existing filter); revisit before public exposure.",
+      "resolution": ""
+    }
+  ],
+  "assumptions": [
+    "Batch size limit of 50 is fixed (not configurable) for now."
+  ],
+  "outOfScope": [
+    "CSV upload",
+    "Partial-success (207) semantics"
+  ]
+}

@@ -1,0 +1,15 @@
+# Production profile: PostgreSQL from environment. Never commit credentials.
+# Either set DATABASE_URL (full JDBC URL) or DB_HOST / DB_PORT / DB_NAME (as provided by most PaaS).
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      connection-timeout: 5000
+
+logging:
+  structured:
+    format:
+      console: ecs   # JSON logs for the platform's log pipeline

@@ -1,0 +1,46 @@
+{
+  "problemStatement": "Improve analytics usefulness for marketing and improve reliability — both underspecified.",
+  "functionalRequirements": [
+    {
+      "id": "FR1",
+      "text": "Analytics improvements (to be clarified)."
+    }
+  ],
+  "nonFunctionalRequirements": [
+    {
+      "id": "NFR1",
+      "category": "reliability",
+      "text": "Reliability improvements (to be clarified)."
+    }
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "given": "TBD",
+      "when": "TBD",
+      "then": "TBD"
+    }
+  ],
+  "ambiguities": [
+    {
+      "question": "What does 'more useful analytics' mean for marketing: which metrics, breakdowns or time windows?",
+      "impact": "HIGH",
+      "proposedDefault": "Add a configurable time window to /stats.",
+      "resolution": ""
+    },
+    {
+      "question": "Which reliability problem should this increment address: availability, data durability, or abuse protection?",
+      "impact": "HIGH",
+      "proposedDefault": "Add a Redis-backed rate limiter for multi-instance deployments.",
+      "resolution": ""
+    },
+    {
+      "question": "Must existing API clients be unaffected?",
+      "impact": "MEDIUM",
+      "proposedDefault": "Yes: changes must be additive and backward compatible.",
+      "resolution": ""
+    }
+  ],
+  "assumptions": [],
+  "outOfScope": []
+}

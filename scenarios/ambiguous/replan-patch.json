@@ -1,0 +1,14 @@
+{
+  "reason": "Stakeholder follow-up after the first run: marketing's dashboard needs the response to state which window was applied.",
+  "acceptanceCriteria": [
+    {
+      "id": "AC4",
+      "given": "days=14",
+      "when": "GET stats",
+      "then": "response field days = 14"
+    }
+  ],
+  "assumptions": [
+    "Dashboard reads the 'days' field rather than recomputing it from 'since'."
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "greenfield",
+  "type": "greenfield",
+  "requirement": "Build a URL shortener service. Users submit a long URL and receive a short link; visiting the short link redirects to the original URL. Link owners can see how many times a link was clicked, broken down per day. The service will be exposed on the public internet, so it must not become a tool for abuse.",
+  "constraints": "Java 21, Spring Boot 3.5.x, Gradle Kotlin DSL using the Gradle wrapper already in the repository.\nSingle-module project at the repository root (settings.gradle.kts, build.gradle.kts, src/).\nBase package io.github.hemanthvk980.shortener. PostgreSQL + Flyway in production; H2 (PostgreSQL mode) for local runs and tests.\nErrors as RFC 7807 problem details. No secrets in code or config: use environment variables.\nTests: JUnit 5, Spring Boot test + MockMvc.",
+  "seedPaths": [
+    "gradlew",
+    "gradlew.bat",
+    "gradle/wrapper"
+  ],
+  "allowedPaths": [
+    "src/",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "README.md",
+    "docs/",
+    "CHANGELOG.md"
+  ],
+  "verifyCommand": [
+    "./gradlew",
+    "test",
+    "--no-daemon",
+    "-q"
+  ],
+  "offlineVerifyCommand": [
+    "sh",
+    "scenarios/common/offline-verify.sh"
+  ],
+  "verifyTimeoutSeconds": 900,
+  "maxLlmCalls": 40,
+  "maxMinutes": 45,
+  "human": {
+    "approver": "hemanth",
+    "approvals": {
+      "design": [
+        "APPROVED: API contract and task plan look right; 302 (not 301) agreed so expiry and analytics keep working"
+      ],
+      "implementation": [
+        "APPROVED: build file uses Boot-managed versions only; V1 migration reviewed"
+      ],
+      "release-readiness": [
+        "APPROVED: checklist green, risks acknowledged; ship to staging"
+      ]
+    },
+    "answers": {}
+  }
+}

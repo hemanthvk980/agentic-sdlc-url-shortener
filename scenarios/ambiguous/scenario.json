@@ -1,0 +1,48 @@
+{
+  "name": "ambiguous",
+  "type": "ambiguous",
+  "requirement": "Make link analytics more useful for the marketing team, and make the service more reliable.",
+  "constraints": "Existing codebase: url-shortener-service (Java 21, Spring Boot 3.5, Gradle Kotlin DSL, package io.github.hemanthvk980.shortener).\nFollow its conventions: layering api → service → repo → domain (enforced by ArchUnit), RFC 7807 errors via common.GlobalExceptionHandler,\nconfiguration via AppProperties. Only modify files under url-shortener-service/. Tests: JUnit 5 + MockMvc in the existing style.",
+  "seedPaths": [
+    "settings.gradle.kts",
+    "build.gradle.kts",
+    "gradle",
+    "gradlew",
+    "gradlew.bat",
+    "orchestrator-core",
+    "url-shortener-service"
+  ],
+  "allowedPaths": [
+    "url-shortener-service/"
+  ],
+  "verifyCommand": [
+    "./gradlew",
+    ":url-shortener-service:test",
+    "--no-daemon",
+    "-q"
+  ],
+  "offlineVerifyCommand": [
+    "sh",
+    "scenarios/common/offline-verify.sh",
+    "url-shortener-service/"
+  ],
+  "verifyTimeoutSeconds": 900,
+  "maxLlmCalls": 60,
+  "maxMinutes": 45,
+  "human": {
+    "approver": "hemanth",
+    "approvals": {
+      "design": [
+        "CHANGES_REQUESTED: keep the default window at 30 days so existing clients see no change",
+        "APPROVED: backward compatible now"
+      ],
+      "release-readiness": [
+        "APPROVED: scope matches the clarified requirement; reliability tracked separately"
+      ]
+    },
+    "answers": {
+      "analytics": "Marketing wants to choose the time window for daily stats (between 7 and 90 days) and to see how many distinct sites referred traffic.",
+      "reliability": "Out of scope for this increment. We will first define SLOs and measure; open a separate ticket. Do not change reliability behaviour now."
+    }
+  }
+}

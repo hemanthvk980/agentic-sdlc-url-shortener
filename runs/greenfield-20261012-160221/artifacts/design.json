@@ -1,0 +1,205 @@
+{
+  "summary": "Layered Spring Boot service (api → service → repository → domain). Random Base62 codes, 302 redirects, asynchronous click recording into a click_event table aggregated per day, Bucket4j-style rate limiting on creation, strict URL validation.",
+  "components": [
+    {
+      "name": "LinkController / RedirectController",
+      "responsibility": "HTTP contract, validation, problem details",
+      "files": [
+        "src/main/java/io/github/hemanthvk980/shortener/web/LinkController.java",
+        "src/main/java/io/github/hemanthvk980/shortener/web/RedirectController.java"
+      ]
+    },
+    {
+      "name": "LinkService",
+      "responsibility": "create, resolve, stats",
+      "files": [
+        "src/main/java/io/github/hemanthvk980/shortener/service/LinkService.java"
+      ]
+    },
+    {
+      "name": "UrlValidator",
+      "responsibility": "scheme/host safety checks",
+      "files": [
+        "src/main/java/io/github/hemanthvk980/shortener/service/UrlValidator.java"
+      ]
+    },
+    {
+      "name": "Persistence",
+      "responsibility": "Link and ClickEvent entities, repositories, Flyway schema",
+      "files": [
+        "src/main/resources/db/migration/V1__init.sql"
+      ]
+    }
+  ],
+  "api": [
+    {
+      "method": "POST",
+      "path": "/api/v1/links",
+      "request": "{url: string}",
+      "responses": [
+        "201 LinkResponse",
+        "400 problem",
+        "429 problem"
+      ],
+      "notes": "url validated by UrlValidator"
+    },
+    {
+      "method": "GET",
+      "path": "/{code}",
+      "request": "-",
+      "responses": [
+        "302 Location",
+        "404 problem"
+      ],
+      "notes": "Cache-Control: no-store"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/links/{code}/stats",
+      "request": "-",
+      "responses": [
+        "200 {code,totalClicks,clicksByDay[]}",
+        "404 problem"
+      ],
+      "notes": "last 30 days"
+    }
+  ],
+  "dataModel": [
+    {
+      "entity": "Link",
+      "change": "new: id, code (unique), target_url, created_at, click_count",
+      "migration": "V1__init.sql"
+    },
+    {
+      "entity": "ClickEvent",
+      "change": "new: id, link_id, clicked_at, click_date",
+      "migration": "V1__init.sql"
+    }
+  ],
+  "adrs": [
+    {
+      "title": "302 instead of 301 redirects",
+      "decision": "Use 302 + no-store",
+      "alternatives": [
+        "301 (cacheable, fewer requests)"
+      ],
+      "consequences": "Every click reaches the service (analytics accurate, links can be disabled) at the cost of more traffic."
+    },
+    {
+      "title": "Random codes instead of encoded sequence ids",
+      "decision": "7-char Base62 from SecureRandom with collision retry",
+      "alternatives": [
+        "Base62(sequence id)",
+        "hash of URL"
+      ],
+      "consequences": "Codes are not enumerable; needs a uniqueness check on insert."
+    },
+    {
+      "title": "Asynchronous click recording",
+      "decision": "Record clicks on a bounded executor",
+      "alternatives": [
+        "Synchronous insert",
+        "Message queue"
+      ],
+      "consequences": "Redirect latency unaffected; clicks may be dropped under overload (acceptable for analytics)."
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Service abused to redirect to phishing/malware",
+      "likelihood": "MEDIUM",
+      "impact": "HIGH",
+      "mitigation": "Scheme/host validation, rate limiting, blocked-host list; disable endpoint in a later increment."
+    },
+    {
+      "risk": "click_event table growth",
+      "likelihood": "HIGH",
+      "impact": "MEDIUM",
+      "mitigation": "Index on (link_id, click_date); retention job."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Project skeleton, build and configuration",
+      "area": "impl",
+      "files": [
+        "settings.gradle.kts",
+        "build.gradle.kts",
+        "src/main/java/io/github/hemanthvk980/shortener/ShortenerApplication.java",
+        "src/main/resources/application.yml"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "app starts with H2"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Domain, repositories and schema",
+      "area": "impl",
+      "files": [
+        "src/main/java/io/github/hemanthvk980/shortener/domain/Link.java",
+        "src/main/java/io/github/hemanthvk980/shortener/domain/ClickEvent.java",
+        "src/main/java/io/github/hemanthvk980/shortener/repo/LinkRepository.java",
+        "src/main/java/io/github/hemanthvk980/shortener/repo/ClickEventRepository.java",
+        "src/main/resources/db/migration/V1__init.sql"
+      ],
+      "dependsOn": [
+        "T1"
+      ],
+      "acceptance": [
+        "schema validates"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Service, validation and HTTP endpoints",
+      "area": "impl",
+      "files": [
+        "src/main/java/io/github/hemanthvk980/shortener/service/UrlValidator.java",
+        "src/main/java/io/github/hemanthvk980/shortener/service/LinkService.java",
+        "src/main/java/io/github/hemanthvk980/shortener/web/LinkController.java",
+        "src/main/java/io/github/hemanthvk980/shortener/web/RedirectController.java"
+      ],
+      "dependsOn": [
+        "T2"
+      ],
+      "acceptance": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "API integration tests",
+      "area": "test",
+      "files": [
+        "src/test/java/io/github/hemanthvk980/shortener/web/LinkApiTest.java"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "README with API reference",
+      "area": "docs",
+      "files": [
+        "README.md"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "documents every endpoint"
+      ]
+    }
+  ]
+}

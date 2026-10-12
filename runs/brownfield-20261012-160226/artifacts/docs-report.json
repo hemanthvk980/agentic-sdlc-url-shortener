@@ -1,0 +1,15 @@
+{
+  "area": "docs",
+  "tasks": [
+    "T4 Document the batch endpoint"
+  ],
+  "files": [
+    {
+      "path": "url-shortener-service/README.md",
+      "type": "MODIFY",
+      "lines": 70,
+      "reason": "API table"
+    }
+  ],
+  "notes": []
+}

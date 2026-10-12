@@ -1,0 +1,69 @@
+# Defaults run locally with zero setup (in-memory H2 in PostgreSQL mode).
+# Production: activate the "prod" profile and provide DATABASE_URL etc. via environment.
+spring:
+  application:
+    name: url-shortener
+  datasource:
+    url: jdbc:h2:mem:shortener;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway, never by Hibernate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework   # honour X-Forwarded-* from the platform load balancer
+  shutdown: graceful
+  error:
+    include-stacktrace: never
+    include-message: never
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+  code-length: 7
+  max-code-generation-attempts: 5
+  max-url-length: 2048
+  default-ttl: ${APP_DEFAULT_TTL:0s}      # 0 = links never expire unless the client asks
+  max-ttl: ${APP_MAX_TTL:3650d}
+  admin-api-key: ${APP_ADMIN_API_KEY:}    # empty = DELETE disabled (fail closed)
+  blocked-hosts: ${APP_BLOCKED_HOSTS:}
+  rate-limit:
+    enabled: ${APP_RATE_LIMIT_ENABLED:true}
+    create-per-minute: ${APP_RATE_LIMIT_CREATE:30}
+    redirect-per-minute: ${APP_RATE_LIMIT_REDIRECT:600}
+  analytics:
+    retention-days: ${APP_ANALYTICS_RETENTION_DAYS:180}
+    stats-days: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: url-shortener
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

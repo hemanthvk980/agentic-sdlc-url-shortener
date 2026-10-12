@@ -1,0 +1,105 @@
+{
+  "summary": "Add a configurable stats window (?days, 7-90) and a distinctReferrers count to the stats response. Default window 7 days to keep responses small.",
+  "components": [
+    {
+      "name": "Stats API",
+      "responsibility": "window parameter + new field",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java"
+      ]
+    }
+  ],
+  "api": [
+    {
+      "method": "GET",
+      "path": "/api/v1/links/{code}/stats",
+      "request": "?days=7..90 (default 7)",
+      "responses": [
+        "200 LinkStats{days, distinctReferrers, ...}",
+        "400",
+        "404"
+      ],
+      "notes": ""
+    }
+  ],
+  "dataModel": [],
+  "adrs": [
+    {
+      "title": "Query-time aggregation",
+      "decision": "Aggregate click_event at request time using the (link_id, click_date) index",
+      "alternatives": [
+        "Pre-aggregated daily table"
+      ],
+      "consequences": "No schema change; fine up to ~10^6 events per link within 90 days."
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Changing the default window alters existing clients' results",
+      "likelihood": "HIGH",
+      "impact": "MEDIUM",
+      "mitigation": "Communicate in changelog."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Distinct-referrer query and windowed stats in service",
+      "area": "impl",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "AC2",
+        "AC3"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Expose ?days on the stats endpoint",
+      "area": "impl",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java"
+      ],
+      "dependsOn": [
+        "T1"
+      ],
+      "acceptance": [
+        "AC1",
+        "AC2"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Stats window integration tests",
+      "area": "test",
+      "files": [
+        "url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/StatsWindowIntegrationTest.java"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Update API docs",
+      "area": "docs",
+      "files": [
+        "url-shortener-service/README.md"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "stats row updated"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "area": "impl",
+  "tasks": [
+    "T1 Distinct-referrer query and windowed stats in service",
+    "T2 Expose ?days on the stats endpoint"
+  ],
+  "files": [
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java",
+      "type": "MODIFY",
+      "lines": 45,
+      "reason": "distinct referrer count (index-backed)"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java",
+      "type": "MODIFY",
+      "lines": 13,
+      "reason": "days + distinctReferrers fields"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+      "type": "MODIFY",
+      "lines": 165,
+      "reason": "windowed stats with bounds check"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+      "type": "MODIFY",
+      "lines": 74,
+      "reason": "?days=7..90, default 30"
+    }
+  ],
+  "notes": [
+    "T1: stats(code) keeps the configured default so other callers are unchanged."
+  ]
+}

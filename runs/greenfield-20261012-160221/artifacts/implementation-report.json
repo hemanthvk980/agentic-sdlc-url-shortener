@@ -1,0 +1,93 @@
+{
+  "area": "impl",
+  "tasks": [
+    "T1 Project skeleton, build and configuration",
+    "T2 Domain, repositories and schema",
+    "T3 Service, validation and HTTP endpoints"
+  ],
+  "files": [
+    {
+      "path": "settings.gradle.kts",
+      "type": "ADD",
+      "lines": 1,
+      "reason": "project definition"
+    },
+    {
+      "path": "build.gradle.kts",
+      "type": "ADD",
+      "lines": 27,
+      "reason": "Spring Boot build with managed dependency versions"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/ShortenerApplication.java",
+      "type": "ADD",
+      "lines": 13,
+      "reason": "entry point"
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "type": "ADD",
+      "lines": 16,
+      "reason": "configuration via environment"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/domain/Link.java",
+      "type": "ADD",
+      "lines": 38,
+      "reason": "link entity"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/domain/ClickEvent.java",
+      "type": "ADD",
+      "lines": 31,
+      "reason": "click entity with denormalised UTC day"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/repo/LinkRepository.java",
+      "type": "ADD",
+      "lines": 17,
+      "reason": "lookup + atomic counter"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/repo/ClickEventRepository.java",
+      "type": "ADD",
+      "lines": 14,
+      "reason": "daily aggregation"
+    },
+    {
+      "path": "src/main/resources/db/migration/V1__init.sql",
+      "type": "ADD",
+      "lines": 16,
+      "reason": "initial schema"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/service/UrlValidator.java",
+      "type": "ADD",
+      "lines": 43,
+      "reason": "NFR1"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/service/LinkService.java",
+      "type": "ADD",
+      "lines": 63,
+      "reason": "FR1-FR4"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/web/LinkController.java",
+      "type": "ADD",
+      "lines": 54,
+      "reason": "FR1, FR3"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/web/RedirectController.java",
+      "type": "ADD",
+      "lines": 33,
+      "reason": "FR2"
+    }
+  ],
+  "notes": [
+    "T1: Datasource defaults to in-memory H2; production values come from environment variables.",
+    "T2: Schema owned by Flyway; Hibernate validates only.",
+    "T3: Click recording is @Async so redirects are not delayed."
+  ]
+}

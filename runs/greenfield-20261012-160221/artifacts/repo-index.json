@@ -1,0 +1,16 @@
+{
+  "greenfield": true,
+  "fileCount": 4,
+  "files": [
+    "gradle/wrapper/gradle-wrapper.jar",
+    "gradle/wrapper/gradle-wrapper.properties",
+    "gradlew",
+    "gradlew.bat"
+  ],
+  "modules": [],
+  "packages": {},
+  "endpoints": [],
+  "entities": [],
+  "migrations": [],
+  "tests": []
+}

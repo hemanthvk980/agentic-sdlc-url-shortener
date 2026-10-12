@@ -1,0 +1,20 @@
+[
+  {
+    "runId": "ambiguous-20261012-160231",
+    "scenario": "ambiguous",
+    "outcome": "SUCCEEDED",
+    "llm": "fixtures(offline)"
+  },
+  {
+    "runId": "brownfield-20261012-160226",
+    "scenario": "brownfield",
+    "outcome": "SUCCEEDED",
+    "llm": "fixtures(offline)"
+  },
+  {
+    "runId": "greenfield-20261012-160221",
+    "scenario": "greenfield",
+    "outcome": "SUCCEEDED",
+    "llm": "fixtures(offline)"
+  }
+]

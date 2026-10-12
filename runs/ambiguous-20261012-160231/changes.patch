@@ -1,0 +1,210 @@
+ url-shortener-service/CHANGELOG.md                 | 13 +++++
+ url-shortener-service/README.md                    |  2 +-
+ .../shortener/link/api/LinkController.java         | 10 ++--
+ .../shortener/link/repo/ClickEventRepository.java  |  5 ++
+ .../shortener/link/service/LinkService.java        | 17 +++++-
+ .../shortener/link/service/LinkStats.java          |  4 +-
+ .../link/api/StatsWindowIntegrationTest.java       | 61 ++++++++++++++++++++++
+ 7 files changed, 105 insertions(+), 7 deletions(-)
+
+diff --git a/url-shortener-service/CHANGELOG.md b/url-shortener-service/CHANGELOG.md
+new file mode 100644
+index 0000000..80552fa
+--- /dev/null
++++ b/url-shortener-service/CHANGELOG.md
+@@ -0,0 +1,13 @@
++# Changelog
++
++## ambiguous-20261012-160231
++
++Add a configurable stats window (?days, 7-90, default 30 — unchanged for existing clients, per reviewer) and a distinctReferrers count. Additive, backward-compatible.
++
++- `GET /api/v1/links/{code}/stats`
++
++## ambiguous-20261012-160231
++
++Add a configurable stats window (?days, 7-90, default 30 — unchanged for existing clients, per reviewer) and a distinctReferrers count. Additive, backward-compatible.
++
++- `GET /api/v1/links/{code}/stats`
+diff --git a/url-shortener-service/README.md b/url-shortener-service/README.md
+index 0469e27..0f3db66 100644
+--- a/url-shortener-service/README.md
++++ b/url-shortener-service/README.md
+@@ -24,7 +24,7 @@ DATABASE_USERNAME=shortener DATABASE_PASSWORD=shortener ./gradlew :url-shortener
+ | `POST` | `/api/v1/links` | Create a link. Body: `{"url", "alias"?, "expiresAt"?}`. Optional `Idempotency-Key` header. | 201, 400, 409, 429 |
+ | `GET` | `/{code}` | Redirect to the target | 302, 404, 410 |
+ | `GET` | `/api/v1/links/{code}` | Link metadata | 200, 404 |
+-| `GET` | `/api/v1/links/{code}/stats` | Total clicks, clicks per day (30 days), top referrers | 200, 404 |
++| `GET` | `/api/v1/links/{code}/stats?days=30` | Total clicks, clicks per day, distinct and top referrers over a 7–90 day window (default 30) | 200, 400, 404 |
+ | `DELETE` | `/api/v1/links/{code}` | Disable a link (requires `X-API-Key`) | 204, 403, 404 |
+ 
+ Errors are [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem documents.
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java
+index 5ef066b..cba22ca 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java
+@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
+ import io.swagger.v3.oas.annotations.Parameter;
+ import io.swagger.v3.oas.annotations.tags.Tag;
+ import jakarta.validation.Valid;
++import jakarta.validation.constraints.Max;
++import jakarta.validation.constraints.Min;
+ import jakarta.validation.constraints.Pattern;
+ import jakarta.validation.constraints.Size;
+ import java.net.URI;
+@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RequestHeader;
+ import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ @RestController
+@@ -54,10 +57,11 @@ public class LinkController {
+         return LinkResponse.of(link, service.shortUrl(code));
+     }
+ 
+-    @Operation(summary = "Click analytics: total, per day, top referrers")
++    @Operation(summary = "Click analytics over a window of 7-90 days (default 30): total, per day, distinct and top referrers")
+     @GetMapping("/{code}/stats")
+-    public LinkStats stats(@PathVariable @Pattern(regexp = "^[A-Za-z0-9_-]{4,32}$") String code) {
+-        return service.stats(code);
++    public LinkStats stats(@PathVariable @Pattern(regexp = "^[A-Za-z0-9_-]{4,32}$") String code,
++                           @RequestParam(defaultValue = "30") @Min(7) @Max(90) int days) {
++        return service.stats(code, days);
+     }
+ 
+     @Operation(summary = "Disable a link (admin; requires X-API-Key). Analytics are retained.")
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java
+index ec909fb..d592bb0 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java
+@@ -34,6 +34,11 @@ public interface ClickEventRepository extends JpaRepository<ClickEvent, Long> {
+             group by coalesce(c.referrerHost, '(direct)') order by count(c) desc""")
+     List<ReferrerCount> topReferrers(@Param("linkId") Long linkId, Pageable page);
+ 
++    @Query("""
++            select count(distinct c.referrerHost) from ClickEvent c
++            where c.linkId = :linkId and c.clickDate >= :since and c.referrerHost is not null""")
++    long countDistinctReferrers(@Param("linkId") Long linkId, @Param("since") LocalDate since);
++
+     @Modifying
+     @Query("delete from ClickEvent c where c.clickedAt < :cutoff")
+     int deleteOlderThan(@Param("cutoff") Instant cutoff);
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java
+index d87c574..aa0d51f 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java
+@@ -115,15 +115,28 @@ public class LinkService {
+         l.disable();
+     }
+ 
++    public static final int MIN_STATS_DAYS = 7;
++    public static final int MAX_STATS_DAYS = 90;
++
++    /** Stats over the default window (configured {@code app.analytics.stats-days}, 30 by default). */
+     @Transactional(readOnly = true)
+     public LinkStats stats(String code) {
++        return stats(code, props.analytics().statsDays());
++    }
++
++    @Transactional(readOnly = true)
++    public LinkStats stats(String code, int days) {
++        if (days < MIN_STATS_DAYS || days > MAX_STATS_DAYS) {
++            throw new InvalidUrlException("days must be between " + MIN_STATS_DAYS + " and " + MAX_STATS_DAYS);
++        }
+         Link l = get(code);
+-        LocalDate since = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC).minusDays(props.analytics().statsDays() - 1L);
++        LocalDate since = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC).minusDays(days - 1L);
+         List<LinkStats.Daily> daily = clicks.countByDay(l.getId(), since).stream()
+                 .map(d -> new LinkStats.Daily(d.getClickDate(), d.getClicks())).toList();
+         List<LinkStats.Referrer> refs = clicks.topReferrers(l.getId(), PageRequest.of(0, 10)).stream()
+                 .map(r -> new LinkStats.Referrer(r.getReferrer(), r.getClicks())).toList();
+-        return new LinkStats(l.getCode(), l.getClickCount(), since, daily, refs);
++        long distinct = clicks.countDistinctReferrers(l.getId(), since);
++        return new LinkStats(l.getCode(), l.getClickCount(), days, since, distinct, daily, refs);
+     }
+ 
+     public String shortUrl(String code) {
+diff --git a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java
+index 63b5efa..0288353 100644
+--- a/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java
++++ b/url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java
+@@ -3,7 +3,9 @@ package io.github.hemanthvk980.shortener.link.service;
+ import java.time.LocalDate;
+ import java.util.List;
+ 
+-public record LinkStats(String code, long totalClicks, LocalDate since, List<Daily> clicksByDay, List<Referrer> topReferrers) {
++/** Click analytics over a window of {@code days} days ending today (UTC). */
++public record LinkStats(String code, long totalClicks, int days, LocalDate since, long distinctReferrers,
++                        List<Daily> clicksByDay, List<Referrer> topReferrers) {
+ 
+     public record Daily(LocalDate day, long clicks) {}
+ 
+diff --git a/url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/StatsWindowIntegrationTest.java b/url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/StatsWindowIntegrationTest.java
+new file mode 100644
+index 0000000..7d07140
+--- /dev/null
++++ b/url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/StatsWindowIntegrationTest.java
+@@ -0,0 +1,61 @@
++package io.github.hemanthvk980.shortener.link.api;
++
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.MockMvc;
++
++@SpringBootTest(properties = {"app.base-url=https://sho.rt", "app.rate-limit.enabled=false"})
++@AutoConfigureMockMvc
++class StatsWindowIntegrationTest {
++
++    @Autowired MockMvc mvc;
++    @Autowired ObjectMapper json;
++
++    private String create() throws Exception {
++        String body = mvc.perform(post("/api/v1/links").contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"url\":\"https://example.com/campaign\"}"))
++                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
++        return json.readTree(body).get("code").asText();
++    }
++
++    @Test
++    void ac1_defaultWindowIs30DaysForExistingClients() throws Exception {
++        String code = create();
++        mvc.perform(get("/api/v1/links/" + code + "/stats")).andExpect(status().isOk()).andExpect(jsonPath("$.days").value(30));
++    }
++
++    @Test
++    void ac2_windowIsConfigurableWithinBounds() throws Exception {
++        String code = create();
++        mvc.perform(get("/api/v1/links/" + code + "/stats?days=7")).andExpect(status().isOk()).andExpect(jsonPath("$.days").value(7));
++        mvc.perform(get("/api/v1/links/" + code + "/stats?days=90")).andExpect(status().isOk());
++        mvc.perform(get("/api/v1/links/" + code + "/stats?days=6")).andExpect(status().isBadRequest());
++        mvc.perform(get("/api/v1/links/" + code + "/stats?days=91")).andExpect(status().isBadRequest());
++    }
++
++    @Test
++    void ac3_countsDistinctReferrers() throws Exception {
++        String code = create();
++        mvc.perform(get("/" + code).header("Referer", "https://a.example/x"));
++        mvc.perform(get("/" + code).header("Referer", "https://a.example/y"));
++        mvc.perform(get("/" + code).header("Referer", "https://b.example/"));
++        mvc.perform(get("/" + code));
++        JsonNode stats = null;
++        for (int i = 0; i < 50; i++) {
++            stats = json.readTree(mvc.perform(get("/api/v1/links/" + code + "/stats")).andReturn().getResponse().getContentAsString());
++            if (stats.get("totalClicks").asLong() == 4) break;
++            Thread.sleep(100);
++        }
++        org.junit.jupiter.api.Assertions.assertEquals(2, stats.get("distinctReferrers").asLong());
++    }
++}

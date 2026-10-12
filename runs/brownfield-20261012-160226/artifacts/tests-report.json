@@ -1,0 +1,15 @@
+{
+  "area": "test",
+  "tasks": [
+    "T3 Batch integration tests"
+  ],
+  "files": [
+    {
+      "path": "url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/BatchCreateIntegrationTest.java",
+      "type": "ADD",
+      "lines": 66,
+      "reason": "AC1-AC4"
+    }
+  ],
+  "notes": []
+}

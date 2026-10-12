@@ -1,0 +1,17 @@
+{
+  "area": "test",
+  "tasks": [
+    "T4 API integration tests"
+  ],
+  "files": [
+    {
+      "path": "src/test/java/io/github/hemanthvk980/shortener/web/LinkApiTest.java",
+      "type": "ADD",
+      "lines": 62,
+      "reason": "AC1-AC5"
+    }
+  ],
+  "notes": [
+    "T4: Async click recording is polled rather than slept on."
+  ]
+}

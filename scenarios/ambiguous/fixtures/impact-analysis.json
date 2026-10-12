@@ -1,0 +1,39 @@
+{
+  "summary": "Read-path only: stats endpoint gains a query parameter and two response fields; one new aggregate query. No schema change.",
+  "impactedFiles": [
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+      "why": "days parameter"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+      "why": "windowed stats"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java",
+      "why": "new fields"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java",
+      "why": "distinct referrer count"
+    }
+  ],
+  "newFiles": [],
+  "impactedApis": [
+    {
+      "method": "GET",
+      "path": "/api/v1/links/{code}/stats",
+      "change": "modified",
+      "backwardCompatible": true
+    }
+  ],
+  "dataFlowChanges": [],
+  "schemaChange": false,
+  "regressionRisks": [
+    {
+      "area": "stats",
+      "risk": "default window must stay 30 days",
+      "testFocus": "LinkApiIntegrationTest.recordsClicksAndReportsStats must still pass"
+    }
+  ]
+}

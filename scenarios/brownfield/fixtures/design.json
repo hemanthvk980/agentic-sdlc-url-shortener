@@ -1,0 +1,137 @@
+{
+  "summary": "Additive endpoint POST /api/v1/links/batch (1-50 entries). Validate every entry up front (collect index → reason), then insert all via the existing create() inside one transaction. 201 with links in request order; 400 problem detail with errors map; 409 if an alias is taken (whole batch rolled back).",
+  "components": [
+    {
+      "name": "LinkController.createBatch",
+      "responsibility": "HTTP contract",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java"
+      ]
+    },
+    {
+      "name": "LinkService.createBatch",
+      "responsibility": "all-or-nothing creation",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java"
+      ]
+    },
+    {
+      "name": "GlobalExceptionHandler",
+      "responsibility": "400 with per-index errors",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java"
+      ]
+    }
+  ],
+  "api": [
+    {
+      "method": "POST",
+      "path": "/api/v1/links/batch",
+      "request": "{links: CreateLinkRequest[1..50]}",
+      "responses": [
+        "201 {links: LinkResponse[]}",
+        "400 problem + errors{index: reason}",
+        "409 problem",
+        "429 problem"
+      ],
+      "notes": "Idempotency-Key not supported for batches in this increment"
+    }
+  ],
+  "dataModel": [],
+  "adrs": [
+    {
+      "title": "All-or-nothing instead of partial success",
+      "decision": "Single transaction; any invalid entry rejects the batch",
+      "alternatives": [
+        "207 Multi-Status with per-item results"
+      ],
+      "consequences": "Simple client semantics for spreadsheet imports; one bad row requires resubmitting the batch."
+    },
+    {
+      "title": "Reuse create() per entry",
+      "decision": "Batch delegates to the existing single-create path",
+      "alternatives": [
+        "Bulk INSERT"
+      ],
+      "consequences": "Identical validation/alias/expiry behaviour; 50 inserts per request is acceptable at this scale."
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Rate-limit amplification: one token creates up to 50 links",
+      "likelihood": "MEDIUM",
+      "impact": "MEDIUM",
+      "mitigation": "Documented; weight tokens by batch size in a follow-up."
+    },
+    {
+      "risk": "Long transactions under large batches",
+      "likelihood": "LOW",
+      "impact": "LOW",
+      "mitigation": "Hard cap of 50 entries."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Batch DTOs and controller endpoint",
+      "area": "impl",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java"
+      ],
+      "dependsOn": [
+        "T2"
+      ],
+      "acceptance": [
+        "AC1",
+        "AC4"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Transactional createBatch with up-front validation",
+      "area": "impl",
+      "files": [
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java",
+        "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "AC2",
+        "AC3"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Batch integration tests",
+      "area": "test",
+      "files": [
+        "url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/BatchCreateIntegrationTest.java"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Document the batch endpoint",
+      "area": "docs",
+      "files": [
+        "url-shortener-service/README.md"
+      ],
+      "dependsOn": [],
+      "acceptance": [
+        "API table updated"
+      ]
+    }
+  ]
+}

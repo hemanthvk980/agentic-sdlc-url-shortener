@@ -1,0 +1,15 @@
+{
+  "area": "docs",
+  "tasks": [
+    "T5 README with API reference"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "type": "ADD",
+      "lines": 22,
+      "reason": "usage + API reference"
+    }
+  ],
+  "notes": []
+}

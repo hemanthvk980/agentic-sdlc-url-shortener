@@ -1,0 +1,109 @@
+{
+  "problemStatement": "Provide an HTTP service that maps long URLs to short, unguessable codes, redirects code requests to the stored URL, and records per-link click counts by day, while preventing use as an attack vector (script URLs, internal-network targets, redirect loops) and limiting abuse.",
+  "functionalRequirements": [
+    {
+      "id": "FR1",
+      "text": "POST /api/v1/links accepts a URL and returns a short code and short URL."
+    },
+    {
+      "id": "FR2",
+      "text": "GET /{code} redirects to the stored URL."
+    },
+    {
+      "id": "FR3",
+      "text": "GET /api/v1/links/{code}/stats returns total clicks and clicks per day."
+    },
+    {
+      "id": "FR4",
+      "text": "Each redirect is counted without slowing the redirect."
+    }
+  ],
+  "nonFunctionalRequirements": [
+    {
+      "id": "NFR1",
+      "category": "security",
+      "text": "Only http/https targets; reject javascript:, data:, credentials in URL, loopback/private IP literals and the service's own host."
+    },
+    {
+      "id": "NFR2",
+      "category": "security",
+      "text": "Codes must not be enumerable (random, not sequential)."
+    },
+    {
+      "id": "NFR3",
+      "category": "reliability",
+      "text": "Creation is protected by per-client rate limiting."
+    },
+    {
+      "id": "NFR4",
+      "category": "performance",
+      "text": "Redirect p95 under 50 ms at the service boundary under nominal load."
+    },
+    {
+      "id": "NFR5",
+      "category": "observability",
+      "text": "Health and Prometheus metrics endpoints exposed."
+    }
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "given": "a valid https URL",
+      "when": "POST /api/v1/links",
+      "then": "201 with code (7 Base62 chars), shortUrl and targetUrl"
+    },
+    {
+      "id": "AC2",
+      "given": "an existing code",
+      "when": "GET /{code}",
+      "then": "302 with Location equal to the stored URL"
+    },
+    {
+      "id": "AC3",
+      "given": "a javascript: URL or a 127.0.0.1 URL",
+      "when": "POST /api/v1/links",
+      "then": "400 problem detail"
+    },
+    {
+      "id": "AC4",
+      "given": "an unknown code",
+      "when": "GET /{code}",
+      "then": "404 problem detail"
+    },
+    {
+      "id": "AC5",
+      "given": "a link clicked twice today",
+      "when": "GET /api/v1/links/{code}/stats",
+      "then": "totalClicks=2 and today's bucket=2"
+    }
+  ],
+  "ambiguities": [
+    {
+      "question": "Should links expire by default?",
+      "impact": "MEDIUM",
+      "proposedDefault": "No default expiry; clients may set expiresAt.",
+      "resolution": "ASSUMED: No default expiry; clients may set expiresAt."
+    },
+    {
+      "question": "Should the same long URL always return the same code?",
+      "impact": "LOW",
+      "proposedDefault": "No: each request creates a new code (simpler, per-campaign analytics).",
+      "resolution": "ASSUMED: No: each request creates a new code (simpler, per-campaign analytics)."
+    },
+    {
+      "question": "How long are click events retained?",
+      "impact": "LOW",
+      "proposedDefault": "180 days, purged nightly.",
+      "resolution": "ASSUMED: 180 days, purged nightly."
+    }
+  ],
+  "assumptions": [
+    "No user accounts in this increment; stats are readable by anyone who knows the code.",
+    "Single region deployment; in-memory rate limiting is acceptable for one instance."
+  ],
+  "outOfScope": [
+    "User accounts and link ownership",
+    "Custom domains",
+    "QR codes"
+  ]
+}

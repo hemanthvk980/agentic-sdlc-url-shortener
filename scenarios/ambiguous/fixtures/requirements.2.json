@@ -1,0 +1,72 @@
+{
+  "problemStatement": "Let marketing choose the analytics window (7-90 days) for a link's stats and see how many distinct referring sites drove traffic, without breaking existing clients. Reliability work is explicitly deferred.",
+  "functionalRequirements": [
+    {
+      "id": "FR1",
+      "text": "GET /api/v1/links/{code}/stats accepts an optional days parameter (7-90)."
+    },
+    {
+      "id": "FR2",
+      "text": "The stats response includes the effective window and the number of distinct referrer hosts in it."
+    }
+  ],
+  "nonFunctionalRequirements": [
+    {
+      "id": "NFR1",
+      "category": "maintainability",
+      "text": "Additive, backward-compatible API change."
+    },
+    {
+      "id": "NFR2",
+      "category": "performance",
+      "text": "Stats queries remain index-backed (link_id, click_date)."
+    }
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "given": "no days parameter",
+      "when": "GET stats",
+      "then": "window is 30 days (unchanged behaviour)"
+    },
+    {
+      "id": "AC2",
+      "given": "days=7 / days=90 / days=6 / days=91",
+      "when": "GET stats",
+      "then": "200 / 200 / 400 / 400"
+    },
+    {
+      "id": "AC3",
+      "given": "clicks from a.example (x2), b.example and direct",
+      "when": "GET stats",
+      "then": "distinctReferrers = 2"
+    }
+  ],
+  "ambiguities": [
+    {
+      "question": "What does 'more useful analytics' mean for marketing: which metrics, breakdowns or time windows?",
+      "impact": "HIGH",
+      "proposedDefault": "Add a configurable time window to /stats.",
+      "resolution": "Marketing wants to choose the time window for daily stats (between 7 and 90 days) and to see how many distinct sites referred traffic."
+    },
+    {
+      "question": "Which reliability problem should this increment address: availability, data durability, or abuse protection?",
+      "impact": "HIGH",
+      "proposedDefault": "Add a Redis-backed rate limiter.",
+      "resolution": "Out of scope for this increment. We will first define SLOs and measure; open a separate ticket. Do not change reliability behaviour now."
+    },
+    {
+      "question": "Must existing API clients be unaffected?",
+      "impact": "MEDIUM",
+      "proposedDefault": "Yes: additive and backward compatible.",
+      "resolution": ""
+    }
+  ],
+  "assumptions": [
+    "Distinct referrers count hosts only (direct traffic excluded)."
+  ],
+  "outOfScope": [
+    "Reliability changes (separate ticket after SLOs are defined)",
+    "Geo/device breakdowns"
+  ]
+}

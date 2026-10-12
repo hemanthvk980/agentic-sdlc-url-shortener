@@ -1,0 +1,637 @@
+{
+  "runId": "ambiguous-20261012-160231",
+  "scenario": "ambiguous",
+  "llm": "fixtures(offline)",
+  "outcome": "SUCCEEDED",
+  "outcomeReason": "all stages succeeded",
+  "startedAt": "2026-10-12T10:32:31.989415402Z",
+  "finishedAt": "2026-10-12T10:32:33.948034218Z",
+  "requirement": "Make link analytics more useful for the marketing team, and make the service more reliable.",
+  "nodes": {
+    "requirements": {
+      "title": "Requirements analysis",
+      "phase": "REQUIREMENTS",
+      "dependsOn": [],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "2 functional requirements, 3 acceptance criteria, 3 ambiguities",
+      "error": null,
+      "inputs": {},
+      "commit": null,
+      "changes": []
+    },
+    "repo-index": {
+      "title": "Codebase index",
+      "phase": "ANALYSIS",
+      "dependsOn": [],
+      "status": "SUCCEEDED",
+      "attempts": 1,
+      "summary": "128 files, 5 endpoints, 3 entities, 2 migrations, 15 test files",
+      "error": null,
+      "inputs": {},
+      "commit": null,
+      "changes": []
+    },
+    "impact-analysis": {
+      "title": "Impact analysis",
+      "phase": "ANALYSIS",
+      "dependsOn": [
+        "requirements",
+        "repo-index"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "4 impacted files, 0 new files, schemaChange=false",
+      "error": null,
+      "inputs": {
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "repo-index.json": "ada4eb9a50e2b50f784c66f48977faa7dbbffa980b16d6b86929b904c2f8097b"
+      },
+      "commit": null,
+      "changes": []
+    },
+    "design": {
+      "title": "Architecture & task plan",
+      "phase": "DESIGN",
+      "dependsOn": [
+        "impact-analysis"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 3,
+      "summary": "4 tasks, 1 API operations, 1 ADRs",
+      "error": null,
+      "inputs": {
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "impact-analysis.json": "dea30bed5f4af6fc2833bf232cd8d2b4cc443225367ce7a77bcd171d8789eecc"
+      },
+      "commit": null,
+      "changes": []
+    },
+    "implementation": {
+      "title": "Implementation",
+      "phase": "IMPLEMENTATION",
+      "dependsOn": [
+        "design"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "2 impl task(s) → 4 file(s)",
+      "error": null,
+      "inputs": {
+        "design.json": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      },
+      "commit": "52194ef090ed1e152e2a9dd71e737343844234f3",
+      "changes": [
+        {
+          "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/repo/ClickEventRepository.java",
+          "type": "MODIFY",
+          "lines": 45,
+          "reason": "distinct referrer count (index-backed)"
+        },
+        {
+          "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkStats.java",
+          "type": "MODIFY",
+          "lines": 13,
+          "reason": "days + distinctReferrers fields"
+        },
+        {
+          "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+          "type": "MODIFY",
+          "lines": 165,
+          "reason": "windowed stats with bounds check"
+        },
+        {
+          "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+          "type": "MODIFY",
+          "lines": 74,
+          "reason": "?days=7..90, default 30"
+        }
+      ]
+    },
+    "tests": {
+      "title": "Test authoring",
+      "phase": "TESTING",
+      "dependsOn": [
+        "design"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "1 test task(s) → 1 file(s)",
+      "error": null,
+      "inputs": {
+        "design.json": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      },
+      "commit": "742330e750e185669160eede93272df5bdd8c355",
+      "changes": [
+        {
+          "path": "url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/StatsWindowIntegrationTest.java",
+          "type": "MODIFY",
+          "lines": 61,
+          "reason": "AC1-AC3"
+        }
+      ]
+    },
+    "docs": {
+      "title": "Documentation",
+      "phase": "DOCUMENTATION",
+      "dependsOn": [
+        "design"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "1 docs task(s) → 1 file(s)",
+      "error": null,
+      "inputs": {
+        "design.json": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      },
+      "commit": "227c913e005a6de8b58412314f385fc1ff8eb3fa",
+      "changes": [
+        {
+          "path": "url-shortener-service/README.md",
+          "type": "MODIFY",
+          "lines": 69,
+          "reason": "stats row"
+        }
+      ]
+    },
+    "verify": {
+      "title": "Build, test & repair",
+      "phase": "VALIDATION",
+      "dependsOn": [
+        "implementation",
+        "tests",
+        "docs"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "verifying merged change set",
+      "error": null,
+      "inputs": {},
+      "commit": null,
+      "changes": []
+    },
+    "review": {
+      "title": "Independent review",
+      "phase": "VALIDATION",
+      "dependsOn": [
+        "verify"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "APPROVE — 1 findings (0 blocking), 0 criteria not fully covered",
+      "error": null,
+      "inputs": {
+        "design.json": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      },
+      "commit": null,
+      "changes": []
+    },
+    "release-readiness": {
+      "title": "Release readiness",
+      "phase": "RELEASE",
+      "dependsOn": [
+        "review"
+      ],
+      "status": "SUCCEEDED",
+      "attempts": 2,
+      "summary": "all release checks pass",
+      "error": null,
+      "inputs": {
+        "design.json": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "requirements.json": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "review.json": "f399b4db753e2a9dc10eee8a4d13d6afa8935218185329026cf47dddb5c4fefc"
+      },
+      "commit": "8fd5c93aed88539c331509fedf89f23dd5056c20",
+      "changes": [
+        {
+          "path": "url-shortener-service/CHANGELOG.md",
+          "type": "MODIFY",
+          "lines": 13,
+          "reason": "release notes"
+        }
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "name": "requirements.json",
+      "hash": "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15",
+      "producedBy": "requirements",
+      "derivedFrom": [],
+      "createdAt": "2026-10-12T10:32:32.124296054Z",
+      "bytes": 2577
+    },
+    {
+      "name": "repo-index.json",
+      "hash": "ada4eb9a50e2b50f784c66f48977faa7dbbffa980b16d6b86929b904c2f8097b",
+      "producedBy": "repo-index",
+      "derivedFrom": [],
+      "createdAt": "2026-10-12T10:32:32.174294743Z",
+      "bytes": 16586
+    },
+    {
+      "name": "impact-analysis.json",
+      "hash": "dea30bed5f4af6fc2833bf232cd8d2b4cc443225367ce7a77bcd171d8789eecc",
+      "producedBy": "impact-analysis",
+      "derivedFrom": [
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15",
+        "ada4eb9a50e2b50f784c66f48977faa7dbbffa980b16d6b86929b904c2f8097b"
+      ],
+      "createdAt": "2026-10-12T10:32:32.215173644Z",
+      "bytes": 1245
+    },
+    {
+      "name": "design.json",
+      "hash": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+      "producedBy": "design",
+      "derivedFrom": [
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15",
+        "dea30bed5f4af6fc2833bf232cd8d2b4cc443225367ce7a77bcd171d8789eecc"
+      ],
+      "createdAt": "2026-10-12T10:32:32.260469766Z",
+      "bytes": 3115
+    },
+    {
+      "name": "tests-report.json",
+      "hash": "c1c90f1f21078219dce5f4026e3b8a3964064f510014772ec7e4c899d90ce475",
+      "producedBy": "tests",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15"
+      ],
+      "createdAt": "2026-10-12T10:32:32.435865976Z",
+      "bytes": 316
+    },
+    {
+      "name": "docs-report.json",
+      "hash": "74574290aef6e7d20d53e491732db769d42b46050f5b164d4b1d9da6f83a3100",
+      "producedBy": "docs",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15"
+      ],
+      "createdAt": "2026-10-12T10:32:32.534771240Z",
+      "bytes": 228
+    },
+    {
+      "name": "implementation-report.json",
+      "hash": "23c0983f9cf7f6dd71c463f7102c2313b4f3fcdd41d9205f86a8601f907ea113",
+      "producedBy": "implementation",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15"
+      ],
+      "createdAt": "2026-10-12T10:32:32.653488019Z",
+      "bytes": 1156
+    },
+    {
+      "name": "review.json",
+      "hash": "ec641dd33e71feaa4ca826f81dfc222690684999261bb47f7f1932882d0ab49c",
+      "producedBy": "review",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15"
+      ],
+      "createdAt": "2026-10-12T10:32:32.983842378Z",
+      "bytes": 918
+    },
+    {
+      "name": "release-readiness.md",
+      "hash": "9afeffc00d8119cc2db10de5cc524fe6a1dfe7dc3f6ef8a433b1e707236d3de3",
+      "producedBy": "release-readiness",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15",
+        "ec641dd33e71feaa4ca826f81dfc222690684999261bb47f7f1932882d0ab49c"
+      ],
+      "createdAt": "2026-10-12T10:32:33.146492891Z",
+      "bytes": 869
+    },
+    {
+      "name": "release-notes.md",
+      "hash": "03a99d868a418f89edb1a683003a3c75c513363c7b68924703f903e9c7c972fe",
+      "producedBy": "release-readiness",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "b3f491c1fb1f10ae589780d5133ef1a7346c3d5e6e452eea664896e6ff4d7d15",
+        "ec641dd33e71feaa4ca826f81dfc222690684999261bb47f7f1932882d0ab49c"
+      ],
+      "createdAt": "2026-10-12T10:32:33.146819188Z",
+      "bytes": 233
+    },
+    {
+      "name": "requirements.json",
+      "hash": "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+      "producedBy": "human:hemanth(scripted)",
+      "derivedFrom": [],
+      "createdAt": "2026-10-12T10:32:33.160836992Z",
+      "bytes": 2784
+    },
+    {
+      "name": "impact-analysis.json",
+      "hash": "dea30bed5f4af6fc2833bf232cd8d2b4cc443225367ce7a77bcd171d8789eecc",
+      "producedBy": "impact-analysis",
+      "derivedFrom": [
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "ada4eb9a50e2b50f784c66f48977faa7dbbffa980b16d6b86929b904c2f8097b"
+      ],
+      "createdAt": "2026-10-12T10:32:33.174756507Z",
+      "bytes": 1245
+    },
+    {
+      "name": "design.json",
+      "hash": "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+      "producedBy": "design",
+      "derivedFrom": [
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "dea30bed5f4af6fc2833bf232cd8d2b4cc443225367ce7a77bcd171d8789eecc"
+      ],
+      "createdAt": "2026-10-12T10:32:33.187080366Z",
+      "bytes": 3115
+    },
+    {
+      "name": "tests-report.json",
+      "hash": "897ac1537b14e617bdebeea969f8bc0b76045ce6ba37f7e3af26815dd7bece20",
+      "producedBy": "tests",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      ],
+      "createdAt": "2026-10-12T10:32:33.324425292Z",
+      "bytes": 319
+    },
+    {
+      "name": "docs-report.json",
+      "hash": "74574290aef6e7d20d53e491732db769d42b46050f5b164d4b1d9da6f83a3100",
+      "producedBy": "docs",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      ],
+      "createdAt": "2026-10-12T10:32:33.410988195Z",
+      "bytes": 228
+    },
+    {
+      "name": "implementation-report.json",
+      "hash": "23c0983f9cf7f6dd71c463f7102c2313b4f3fcdd41d9205f86a8601f907ea113",
+      "producedBy": "implementation",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      ],
+      "createdAt": "2026-10-12T10:32:33.515335659Z",
+      "bytes": 1156
+    },
+    {
+      "name": "review.json",
+      "hash": "f399b4db753e2a9dc10eee8a4d13d6afa8935218185329026cf47dddb5c4fefc",
+      "producedBy": "review",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb"
+      ],
+      "createdAt": "2026-10-12T10:32:33.817310875Z",
+      "bytes": 1085
+    },
+    {
+      "name": "release-readiness.md",
+      "hash": "464f1df33427028e7f171745fe406dd76eeda97b3387d3ed3cc523c20ebc8ae7",
+      "producedBy": "release-readiness",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "f399b4db753e2a9dc10eee8a4d13d6afa8935218185329026cf47dddb5c4fefc"
+      ],
+      "createdAt": "2026-10-12T10:32:33.944755063Z",
+      "bytes": 869
+    },
+    {
+      "name": "release-notes.md",
+      "hash": "03a99d868a418f89edb1a683003a3c75c513363c7b68924703f903e9c7c972fe",
+      "producedBy": "release-readiness",
+      "derivedFrom": [
+        "a2a89660eb60c87888dee91c13cf627ea7ffb403de1bd6008acab742b6c3fefc",
+        "df5a730e91c662bb7a878fd631a5d820fe2f418914530b0439572c57445985eb",
+        "f399b4db753e2a9dc10eee8a4d13d6afa8935218185329026cf47dddb5c4fefc"
+      ],
+      "createdAt": "2026-10-12T10:32:33.946263295Z",
+      "bytes": 233
+    }
+  ],
+  "decisions": [
+    {
+      "at": "2026-10-12T10:32:32.099049187Z",
+      "node": "requirements",
+      "kind": "CLARIFICATION",
+      "actor": "human:human",
+      "summary": "What does 'more useful analytics' mean for marketing: which metrics, breakdowns or time windows?  [proposed default: Add a configurable time window to /stats.]",
+      "rationale": "Marketing wants to choose the time window for daily stats (between 7 and 90 days) and to see how many distinct sites referred traffic."
+    },
+    {
+      "at": "2026-10-12T10:32:32.099066537Z",
+      "node": "requirements",
+      "kind": "CLARIFICATION",
+      "actor": "human:human",
+      "summary": "Which reliability problem should this increment address: availability, data durability, or abuse protection?  [proposed default: Add a Redis-backed rate limiter for multi-instance deployments.]",
+      "rationale": "Out of scope for this increment. We will first define SLOs and measure; open a separate ticket. Do not change reliability behaviour now."
+    },
+    {
+      "at": "2026-10-12T10:32:32.102033367Z",
+      "node": "requirements",
+      "kind": "REPLAN",
+      "actor": "system",
+      "summary": "Re-executing with 2 clarification(s)",
+      "rationale": "ambiguity resolved by human"
+    },
+    {
+      "at": "2026-10-12T10:32:32.110686175Z",
+      "node": "requirements",
+      "kind": "ASSUMPTION",
+      "actor": "agent:requirements",
+      "summary": "Must existing API clients be unaffected?",
+      "rationale": "impact MEDIUM; default applied: Yes: additive and backward compatible."
+    },
+    {
+      "at": "2026-10-12T10:32:32.110723793Z",
+      "node": "requirements",
+      "kind": "ASSUMPTION",
+      "actor": "agent:requirements",
+      "summary": "Distinct referrers count hosts only (direct traffic excluded).",
+      "rationale": "stated by requirements agent"
+    },
+    {
+      "at": "2026-10-12T10:32:32.240641478Z",
+      "node": "design",
+      "kind": "CHANGES_REQUESTED",
+      "actor": "human:hemanth(scripted)",
+      "summary": "CHANGES_REQUESTED — stage 'Architecture & task plan' requires human sign-off",
+      "rationale": "keep the default window at 30 days so existing clients see no change"
+    },
+    {
+      "at": "2026-10-12T10:32:32.251846899Z",
+      "node": "design",
+      "kind": "HUMAN_APPROVAL",
+      "actor": "human:hemanth(scripted)",
+      "summary": "APPROVED — stage 'Architecture & task plan' requires human sign-off",
+      "rationale": "backward compatible now"
+    },
+    {
+      "at": "2026-10-12T10:32:32.251287496Z",
+      "node": "design",
+      "kind": "DESIGN_CHOICE",
+      "actor": "agent:design",
+      "summary": "Query-time aggregation",
+      "rationale": "Aggregate click_event at request time using the (link_id, click_date) index | alternatives: [Pre-aggregated daily table] | consequences: No schema change; fine up to ~10^6 events per link within 90 days."
+    },
+    {
+      "at": "2026-10-12T10:32:33.023285117Z",
+      "node": "release-readiness",
+      "kind": "HUMAN_APPROVAL",
+      "actor": "human:hemanth(scripted)",
+      "summary": "APPROVED — stage 'Release readiness' requires human sign-off",
+      "rationale": "scope matches the clarified requirement; reliability tracked separately"
+    },
+    {
+      "at": "2026-10-12T10:32:33.164420423Z",
+      "node": null,
+      "kind": "REPLAN",
+      "actor": "human:hemanth(scripted)",
+      "summary": "Upstream artifact 'requirements.json' changed; invalidated [impact-analysis, design, implementation, tests, docs, verify, review, release-readiness]",
+      "rationale": "Stakeholder follow-up after the first run: marketing's dashboard needs the response to state which window was applied."
+    },
+    {
+      "at": "2026-10-12T10:32:33.182370918Z",
+      "node": "design",
+      "kind": "HUMAN_APPROVAL",
+      "actor": "human:hemanth(scripted)",
+      "summary": "APPROVED — stage 'Architecture & task plan' requires human sign-off",
+      "rationale": "backward compatible now"
+    },
+    {
+      "at": "2026-10-12T10:32:33.181840785Z",
+      "node": "design",
+      "kind": "DESIGN_CHOICE",
+      "actor": "agent:design",
+      "summary": "Query-time aggregation",
+      "rationale": "Aggregate click_event at request time using the (link_id, click_date) index | alternatives: [Pre-aggregated daily table] | consequences: No schema change; fine up to ~10^6 events per link within 90 days."
+    },
+    {
+      "at": "2026-10-12T10:32:33.830818Z",
+      "node": "release-readiness",
+      "kind": "HUMAN_APPROVAL",
+      "actor": "human:hemanth(scripted)",
+      "summary": "APPROVED — stage 'Release readiness' requires human sign-off",
+      "rationale": "scope matches the clarified requirement; reliability tracked separately"
+    }
+  ],
+  "clarifications": {
+    "What does 'more useful analytics' mean for marketing: which metrics, breakdowns or time windows?  [proposed default: Add a configurable time window to /stats.]": "Marketing wants to choose the time window for daily stats (between 7 and 90 days) and to see how many distinct sites referred traffic.",
+    "Which reliability problem should this increment address: availability, data durability, or abuse protection?  [proposed default: Add a Redis-backed rate limiter for multi-instance deployments.]": "Out of scope for this increment. We will first define SLOs and measure; open a separate ticket. Do not change reliability behaviour now."
+  },
+  "metrics": {
+    "e2eLatencyMs": 1986,
+    "humanWaitMs": 1,
+    "e2eLatencyExcludingHumanMs": 1985,
+    "retries": 1,
+    "rollbacks": 0,
+    "fallbacks": 0,
+    "recoveries": 0,
+    "mttrMs": 0,
+    "llmCalls": 17,
+    "llmFailures": 0,
+    "llmLatencyMs": 17,
+    "llmTokens": 0,
+    "approvalsGranted": 4,
+    "approvalsRejected": 1,
+    "policyBlocks": 0,
+    "replans": 2,
+    "nodes": {
+      "release-readiness": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 290,
+        "recoveryMs": -1
+      },
+      "requirements": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 71,
+        "recoveryMs": -1
+      },
+      "impact-analysis": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 52,
+        "recoveryMs": -1
+      },
+      "tests": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 313,
+        "recoveryMs": -1
+      },
+      "docs": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 501,
+        "recoveryMs": -1
+      },
+      "review": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 55,
+        "recoveryMs": -1
+      },
+      "repo-index": {
+        "attempts": 1,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 121,
+        "recoveryMs": -1
+      },
+      "design": {
+        "attempts": 3,
+        "retries": 1,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 53,
+        "recoveryMs": -1
+      },
+      "implementation": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 721,
+        "recoveryMs": -1
+      },
+      "verify": {
+        "attempts": 2,
+        "retries": 0,
+        "rollbacks": 0,
+        "fallbacks": 0,
+        "durationMs": 573,
+        "recoveryMs": -1
+      }
+    }
+  },
+  "auditEvents": 153,
+  "auditChainValid": true
+}

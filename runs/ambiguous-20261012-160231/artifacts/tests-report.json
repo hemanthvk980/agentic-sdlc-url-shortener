@@ -1,0 +1,15 @@
+{
+  "area": "test",
+  "tasks": [
+    "T3 Stats window integration tests"
+  ],
+  "files": [
+    {
+      "path": "url-shortener-service/src/test/java/io/github/hemanthvk980/shortener/link/api/StatsWindowIntegrationTest.java",
+      "type": "MODIFY",
+      "lines": 61,
+      "reason": "AC1-AC3"
+    }
+  ],
+  "notes": []
+}

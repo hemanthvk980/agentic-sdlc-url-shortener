@@ -1,0 +1,574 @@
+ CHANGELOG.md                                       |  9 ++++
+ README.md                                          | 22 ++++++++
+ build.gradle.kts                                   | 27 ++++++++++
+ settings.gradle.kts                                |  1 +
+ .../shortener/ShortenerApplication.java            | 13 +++++
+ .../hemanthvk980/shortener/domain/ClickEvent.java  | 31 +++++++++++
+ .../github/hemanthvk980/shortener/domain/Link.java | 38 +++++++++++++
+ .../shortener/repo/ClickEventRepository.java       | 14 +++++
+ .../shortener/repo/LinkRepository.java             | 17 ++++++
+ .../shortener/service/LinkService.java             | 63 ++++++++++++++++++++++
+ .../shortener/service/UrlValidator.java            | 43 +++++++++++++++
+ .../hemanthvk980/shortener/web/LinkController.java | 55 +++++++++++++++++++
+ .../shortener/web/RedirectController.java          | 33 ++++++++++++
+ src/main/resources/application.yml                 | 16 ++++++
+ src/main/resources/db/migration/V1__init.sql       | 16 ++++++
+ .../hemanthvk980/shortener/web/LinkApiTest.java    | 62 +++++++++++++++++++++
+ 16 files changed, 460 insertions(+)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+new file mode 100644
+index 0000000..8b3a31d
+--- /dev/null
++++ b/CHANGELOG.md
+@@ -0,0 +1,9 @@
++# Changelog
++
++## greenfield-20261012-160221
++
++Layered Spring Boot service (api → service → repository → domain). Random Base62 codes, 302 redirects, asynchronous click recording into a click_event table aggregated per day, Bucket4j-style rate limiting on creation, strict URL validation.
++
++- `POST /api/v1/links`
++- `GET /{code}`
++- `GET /api/v1/links/{code}/stats`
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..be1f3aa
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,22 @@
++# URL Shortener
++
++Create short links, redirect, and read click analytics.
++
++## Run
++
++```bash
++./gradlew bootRun          # in-memory H2 on http://localhost:8080
++```
++
++Production: set `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `APP_BASE_URL`.
++
++## API
++
++| Method | Path | Result |
++|---|---|---|
++| POST | `/api/v1/links` `{"url": "..."}` | `201 {code, shortUrl, targetUrl}`; `400` for unsafe/invalid URLs |
++| GET | `/{code}` | `302` to the target; `404` if unknown |
++| GET | `/api/v1/links/{code}/stats` | `{code, totalClicks, clicksByDay[]}` (last 30 days) |
++
++Only `http`/`https` URLs are accepted; URLs with credentials, `localhost`, private/loopback IPs and this
++service's own host are rejected.
+diff --git a/build.gradle.kts b/build.gradle.kts
+new file mode 100644
+index 0000000..50e3e3b
+--- /dev/null
++++ b/build.gradle.kts
+@@ -0,0 +1,27 @@
++plugins {
++    java
++    id("org.springframework.boot") version "3.5.6"
++    id("io.spring.dependency-management") version "1.1.7"
++}
++
++group = "io.github.hemanthvk980"
++version = "0.1.0"
++
++java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } }
++
++repositories { mavenCentral() }
++
++dependencies {
++    implementation("org.springframework.boot:spring-boot-starter-web")
++    implementation("org.springframework.boot:spring-boot-starter-validation")
++    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
++    implementation("org.springframework.boot:spring-boot-starter-actuator")
++    implementation("org.flywaydb:flyway-core")
++    implementation("org.flywaydb:flyway-database-postgresql")
++    runtimeOnly("org.postgresql:postgresql")
++    runtimeOnly("com.h2database:h2")
++    testImplementation("org.springframework.boot:spring-boot-starter-test")
++    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
++}
++
++tasks.test { useJUnitPlatform() }
+diff --git a/settings.gradle.kts b/settings.gradle.kts
+new file mode 100644
+index 0000000..9b7b36c
+--- /dev/null
++++ b/settings.gradle.kts
+@@ -0,0 +1 @@
++rootProject.name = "url-shortener"
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/ShortenerApplication.java b/src/main/java/io/github/hemanthvk980/shortener/ShortenerApplication.java
+new file mode 100644
+index 0000000..33f4c46
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/ShortenerApplication.java
+@@ -0,0 +1,13 @@
++package io.github.hemanthvk980.shortener;
++
++import org.springframework.boot.SpringApplication;
++import org.springframework.boot.autoconfigure.SpringBootApplication;
++import org.springframework.scheduling.annotation.EnableAsync;
++
++@SpringBootApplication
++@EnableAsync
++public class ShortenerApplication {
++    public static void main(String[] args) {
++        SpringApplication.run(ShortenerApplication.class, args);
++    }
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/domain/ClickEvent.java b/src/main/java/io/github/hemanthvk980/shortener/domain/ClickEvent.java
+new file mode 100644
+index 0000000..f3917b3
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/domain/ClickEvent.java
+@@ -0,0 +1,31 @@
++package io.github.hemanthvk980.shortener.domain;
++
++import jakarta.persistence.*;
++import java.time.Instant;
++import java.time.LocalDate;
++import java.time.ZoneOffset;
++
++@Entity
++@Table(name = "click_event")
++public class ClickEvent {
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Column(name = "link_id", nullable = false)
++    private Long linkId;
++
++    @Column(name = "clicked_at", nullable = false)
++    private Instant clickedAt;
++
++    @Column(name = "click_date", nullable = false)
++    private LocalDate clickDate;
++
++    protected ClickEvent() {}
++
++    public ClickEvent(Long linkId, Instant clickedAt) {
++        this.linkId = linkId;
++        this.clickedAt = clickedAt;
++        this.clickDate = LocalDate.ofInstant(clickedAt, ZoneOffset.UTC);
++    }
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/domain/Link.java b/src/main/java/io/github/hemanthvk980/shortener/domain/Link.java
+new file mode 100644
+index 0000000..1fc4331
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/domain/Link.java
+@@ -0,0 +1,38 @@
++package io.github.hemanthvk980.shortener.domain;
++
++import jakarta.persistence.*;
++import java.time.Instant;
++
++@Entity
++@Table(name = "link")
++public class Link {
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Column(nullable = false, unique = true, length = 16)
++    private String code;
++
++    @Column(name = "target_url", nullable = false, length = 2048)
++    private String targetUrl;
++
++    @Column(name = "created_at", nullable = false)
++    private Instant createdAt;
++
++    @Column(name = "click_count", nullable = false)
++    private long clickCount;
++
++    protected Link() {}
++
++    public Link(String code, String targetUrl, Instant createdAt) {
++        this.code = code;
++        this.targetUrl = targetUrl;
++        this.createdAt = createdAt;
++    }
++
++    public Long getId() { return id; }
++    public String getCode() { return code; }
++    public String getTargetUrl() { return targetUrl; }
++    public Instant getCreatedAt() { return createdAt; }
++    public long getClickCount() { return clickCount; }
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/repo/ClickEventRepository.java b/src/main/java/io/github/hemanthvk980/shortener/repo/ClickEventRepository.java
+new file mode 100644
+index 0000000..4d5932a
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/repo/ClickEventRepository.java
+@@ -0,0 +1,14 @@
++package io.github.hemanthvk980.shortener.repo;
++
++import io.github.hemanthvk980.shortener.domain.ClickEvent;
++import java.time.LocalDate;
++import java.util.List;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
++
++public interface ClickEventRepository extends JpaRepository<ClickEvent, Long> {
++    interface Daily { LocalDate getClickDate(); long getClicks(); }
++
++    @Query("select c.clickDate as clickDate, count(c) as clicks from ClickEvent c where c.linkId = :linkId and c.clickDate >= :since group by c.clickDate order by c.clickDate")
++    List<Daily> countByDay(Long linkId, LocalDate since);
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/repo/LinkRepository.java b/src/main/java/io/github/hemanthvk980/shortener/repo/LinkRepository.java
+new file mode 100644
+index 0000000..48f498f
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/repo/LinkRepository.java
+@@ -0,0 +1,17 @@
++package io.github.hemanthvk980.shortener.repo;
++
++import io.github.hemanthvk980.shortener.domain.Link;
++import java.util.Optional;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Modifying;
++import org.springframework.data.jpa.repository.Query;
++
++public interface LinkRepository extends JpaRepository<Link, Long> {
++    Optional<Link> findByCode(String code);
++
++    boolean existsByCode(String code);
++
++    @Modifying
++    @Query("update Link l set l.clickCount = l.clickCount + 1 where l.id = :id")
++    int incrementClicks(Long id);
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/service/LinkService.java b/src/main/java/io/github/hemanthvk980/shortener/service/LinkService.java
+new file mode 100644
+index 0000000..a2621df
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/service/LinkService.java
+@@ -0,0 +1,63 @@
++package io.github.hemanthvk980.shortener.service;
++
++import io.github.hemanthvk980.shortener.domain.ClickEvent;
++import io.github.hemanthvk980.shortener.domain.Link;
++import io.github.hemanthvk980.shortener.repo.ClickEventRepository;
++import io.github.hemanthvk980.shortener.repo.LinkRepository;
++import java.security.SecureRandom;
++import java.time.Instant;
++import java.time.LocalDate;
++import java.time.ZoneOffset;
++import java.util.List;
++import java.util.NoSuchElementException;
++import org.springframework.scheduling.annotation.Async;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++@Service
++public class LinkService {
++    private static final String ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
++    private final SecureRandom random = new SecureRandom();
++    private final LinkRepository links;
++    private final ClickEventRepository clicks;
++    private final UrlValidator validator;
++
++    public LinkService(LinkRepository links, ClickEventRepository clicks, UrlValidator validator) {
++        this.links = links;
++        this.clicks = clicks;
++        this.validator = validator;
++    }
++
++    @Transactional
++    public Link create(String url) {
++        String target = validator.validate(url);
++        for (int i = 0; i < 5; i++) {
++            String code = nextCode();
++            if (!links.existsByCode(code)) return links.save(new Link(code, target, Instant.now()));
++        }
++        throw new IllegalStateException("could not allocate a code");
++    }
++
++    @Transactional(readOnly = true)
++    public Link resolve(String code) {
++        return links.findByCode(code).orElseThrow(() -> new NoSuchElementException("no link " + code));
++    }
++
++    @Async
++    @Transactional
++    public void recordClick(Long linkId) {
++        clicks.save(new ClickEvent(linkId, Instant.now()));
++        links.incrementClicks(linkId);
++    }
++
++    @Transactional(readOnly = true)
++    public List<ClickEventRepository.Daily> daily(Link link) {
++        return clicks.countByDay(link.getId(), LocalDate.now(ZoneOffset.UTC).minusDays(29));
++    }
++
++    private String nextCode() {
++        char[] c = new char[7];
++        for (int i = 0; i < c.length; i++) c[i] = ALPHABET.charAt(random.nextInt(ALPHABET.length()));
++        return new String(c);
++    }
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/service/UrlValidator.java b/src/main/java/io/github/hemanthvk980/shortener/service/UrlValidator.java
+new file mode 100644
+index 0000000..50d7159
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/service/UrlValidator.java
+@@ -0,0 +1,43 @@
++package io.github.hemanthvk980.shortener.service;
++
++import java.net.InetAddress;
++import java.net.URI;
++import java.util.Locale;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Component;
++
++@Component
++public class UrlValidator {
++    private final String ownHost;
++
++    public UrlValidator(@Value("${app.base-url}") String baseUrl) {
++        this.ownHost = URI.create(baseUrl).getHost();
++    }
++
++    public String validate(String raw) {
++        URI uri;
++        try {
++            uri = new URI(raw.strip());
++        } catch (Exception e) {
++            throw new IllegalArgumentException("url is not well-formed");
++        }
++        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
++        if (!scheme.equals("http") && !scheme.equals("https")) throw new IllegalArgumentException("only http and https urls are allowed");
++        if (uri.getUserInfo() != null) throw new IllegalArgumentException("credentials in url are not allowed");
++        String host = uri.getHost();
++        if (host == null) throw new IllegalArgumentException("url must have a host");
++        host = host.toLowerCase(Locale.ROOT);
++        if (host.equals("localhost") || host.equalsIgnoreCase(ownHost)) throw new IllegalArgumentException("host not allowed");
++        if (host.matches("^[0-9.]+$") || host.startsWith("[")) {
++            try {
++                InetAddress a = InetAddress.getByName(host.replace("[", "").replace("]", ""));
++                if (a.isLoopbackAddress() || a.isSiteLocalAddress() || a.isLinkLocalAddress() || a.isAnyLocalAddress()) {
++                    throw new IllegalArgumentException("private addresses are not allowed");
++                }
++            } catch (java.net.UnknownHostException e) {
++                throw new IllegalArgumentException("invalid address");
++            }
++        }
++        return uri.toString();
++    }
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/web/LinkController.java b/src/main/java/io/github/hemanthvk980/shortener/web/LinkController.java
+new file mode 100644
+index 0000000..329a5b8
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/web/LinkController.java
+@@ -0,0 +1,55 @@
++package io.github.hemanthvk980.shortener.web;
++
++import io.github.hemanthvk980.shortener.domain.Link;
++import io.github.hemanthvk980.shortener.service.LinkService;
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotBlank;
++import java.net.URI;
++import java.util.List;
++import java.util.Map;
++import java.util.NoSuchElementException;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.ProblemDetail;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.annotation.*;
++
++@RestController
++@RequestMapping("/api/v1/links")
++public class LinkController {
++    public record CreateLinkRequest(@NotBlank String url) {}
++
++    public record LinkResponse(String code, String shortUrl, String targetUrl) {}
++
++    private final LinkService service;
++    private final String baseUrl;
++
++    public LinkController(LinkService service, @Value("${app.base-url}") String baseUrl) {
++        this.service = service;
++        this.baseUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
++    }
++
++    @PostMapping
++    public ResponseEntity<LinkResponse> create(@Valid @RequestBody CreateLinkRequest req) {
++        Link l = service.create(req.url());
++        return ResponseEntity.created(URI.create("/api/v1/links/" + l.getCode()))
++                .body(new LinkResponse(l.getCode(), baseUrl + l.getCode(), l.getTargetUrl()));
++    }
++
++    @GetMapping("/{code}/stats")
++    public Map<String, Object> stats(@PathVariable String code) {
++        Link l = service.resolve(code);
++        List<?> daily = service.daily(l);
++        return Map.of("code", code, "totalClicks", l.getClickCount(), "clicksByDay", daily);
++    }
++
++    @ExceptionHandler(IllegalArgumentException.class)
++    ProblemDetail badRequest(IllegalArgumentException e) {
++        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
++    }
++
++    @ExceptionHandler(NoSuchElementException.class)
++    ProblemDetail notFound(NoSuchElementException e) {
++        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
++    }
++}
+diff --git a/src/main/java/io/github/hemanthvk980/shortener/web/RedirectController.java b/src/main/java/io/github/hemanthvk980/shortener/web/RedirectController.java
+new file mode 100644
+index 0000000..b51e99c
+--- /dev/null
++++ b/src/main/java/io/github/hemanthvk980/shortener/web/RedirectController.java
+@@ -0,0 +1,33 @@
++package io.github.hemanthvk980.shortener.web;
++
++import io.github.hemanthvk980.shortener.domain.Link;
++import io.github.hemanthvk980.shortener.service.LinkService;
++import java.net.URI;
++import java.util.NoSuchElementException;
++import org.springframework.http.CacheControl;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.ProblemDetail;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.annotation.*;
++
++@RestController
++public class RedirectController {
++    private final LinkService service;
++
++    public RedirectController(LinkService service) {
++        this.service = service;
++    }
++
++    @GetMapping("/{code:[A-Za-z0-9]+}")
++    public ResponseEntity<Void> redirect(@PathVariable String code) {
++        Link l = service.resolve(code);
++        service.recordClick(l.getId());
++        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(l.getTargetUrl()))
++                .cacheControl(CacheControl.noStore()).build();
++    }
++
++    @ExceptionHandler(NoSuchElementException.class)
++    ProblemDetail notFound(NoSuchElementException e) {
++        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
++    }
++}
+diff --git a/src/main/resources/application.yml b/src/main/resources/application.yml
+new file mode 100644
+index 0000000..569f2bc
+--- /dev/null
++++ b/src/main/resources/application.yml
+@@ -0,0 +1,16 @@
++spring:
++  datasource:
++    url: ${DATABASE_URL:jdbc:h2:mem:shortener;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE}
++    username: ${DATABASE_USERNAME:sa}
++    password: ${DATABASE_PASSWORD:}
++  jpa:
++    open-in-view: false
++    hibernate:
++      ddl-auto: validate
++app:
++  base-url: ${APP_BASE_URL:http://localhost:8080}
++management:
++  endpoints:
++    web:
++      exposure:
++        include: health,prometheus
+diff --git a/src/main/resources/db/migration/V1__init.sql b/src/main/resources/db/migration/V1__init.sql
+new file mode 100644
+index 0000000..bb1167f
+--- /dev/null
++++ b/src/main/resources/db/migration/V1__init.sql
+@@ -0,0 +1,16 @@
++CREATE TABLE link (
++    id          BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
++    code        VARCHAR(16)   NOT NULL UNIQUE,
++    target_url  VARCHAR(2048) NOT NULL,
++    created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
++    click_count BIGINT NOT NULL DEFAULT 0
++);
++
++CREATE TABLE click_event (
++    id         BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
++    link_id    BIGINT NOT NULL REFERENCES link (id),
++    clicked_at TIMESTAMP WITH TIME ZONE NOT NULL,
++    click_date DATE NOT NULL
++);
++
++CREATE INDEX ix_click_event_link_date ON click_event (link_id, click_date);
+diff --git a/src/test/java/io/github/hemanthvk980/shortener/web/LinkApiTest.java b/src/test/java/io/github/hemanthvk980/shortener/web/LinkApiTest.java
+new file mode 100644
+index 0000000..abe89eb
+--- /dev/null
++++ b/src/test/java/io/github/hemanthvk980/shortener/web/LinkApiTest.java
+@@ -0,0 +1,62 @@
++package io.github.hemanthvk980.shortener.web;
++
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.MockMvc;
++
++@SpringBootTest
++@AutoConfigureMockMvc
++class LinkApiTest {
++    @Autowired MockMvc mvc;
++    @Autowired ObjectMapper json;
++
++    private String create(String url) throws Exception {
++        String body = mvc.perform(post("/api/v1/links").contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"url\":\"" + url + "\"}"))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.matchesPattern("^[0-9A-Za-z]{7}$")))
++                .andReturn().getResponse().getContentAsString();
++        return json.readTree(body).get("code").asText();
++    }
++
++    @Test
++    void ac1_and_ac2_createThenRedirect() throws Exception {
++        String code = create("https://example.com/docs");
++        mvc.perform(get("/" + code)).andExpect(status().isFound())
++                .andExpect(header().string("Location", "https://example.com/docs"));
++    }
++
++    @Test
++    void ac3_rejectsUnsafeUrls() throws Exception {
++        for (String bad : new String[] {"javascript:alert(1)", "http://127.0.0.1/admin"}) {
++            mvc.perform(post("/api/v1/links").contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"" + bad + "\"}"))
++                    .andExpect(status().isBadRequest());
++        }
++    }
++
++    @Test
++    void ac4_unknownCodeIs404() throws Exception {
++        mvc.perform(get("/zzzzzzz")).andExpect(status().isNotFound());
++    }
++
++    @Test
++    void ac5_statsCountClicks() throws Exception {
++        String code = create("https://example.com/stats");
++        mvc.perform(get("/" + code));
++        mvc.perform(get("/" + code));
++        for (int i = 0; i < 50; i++) {
++            String s = mvc.perform(get("/api/v1/links/" + code + "/stats")).andReturn().getResponse().getContentAsString();
++            if (json.readTree(s).get("totalClicks").asLong() == 2) return;
++            Thread.sleep(100);
++        }
++        throw new AssertionError("clicks were not recorded");
++    }
++}

@@ -1,0 +1,25 @@
+{
+  "files": [
+    {
+      "path": "settings.gradle.kts",
+      "content": "rootProject.name = \"url-shortener\"\n",
+      "reason": "project definition"
+    },
+    {
+      "path": "build.gradle.kts",
+      "content": "plugins {\n    java\n    id(\"org.springframework.boot\") version \"3.5.6\"\n    id(\"io.spring.dependency-management\") version \"1.1.7\"\n}\n\ngroup = \"io.github.hemanthvk980\"\nversion = \"0.1.0\"\n\njava { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } }\n\nrepositories { mavenCentral() }\n\ndependencies {\n    implementation(\"org.springframework.boot:spring-boot-starter-web\")\n    implementation(\"org.springframework.boot:spring-boot-starter-validation\")\n    implementation(\"org.springframework.boot:spring-boot-starter-data-jpa\")\n    implementation(\"org.springframework.boot:spring-boot-starter-actuator\")\n    implementation(\"org.flywaydb:flyway-core\")\n    implementation(\"org.flywaydb:flyway-database-postgresql\")\n    runtimeOnly(\"org.postgresql:postgresql\")\n    runtimeOnly(\"com.h2database:h2\")\n    testImplementation(\"org.springframework.boot:spring-boot-starter-test\")\n    testRuntimeOnly(\"org.junit.platform:junit-platform-launcher\")\n}\n\ntasks.test { useJUnitPlatform() }\n",
+      "reason": "Spring Boot build with managed dependency versions"
+    },
+    {
+      "path": "src/main/java/io/github/hemanthvk980/shortener/ShortenerApplication.java",
+      "content": "package io.github.hemanthvk980.shortener;\n\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\nimport org.springframework.scheduling.annotation.EnableAsync;\n\n@SpringBootApplication\n@EnableAsync\npublic class ShortenerApplication {\n    public static void main(String[] args) {\n        SpringApplication.run(ShortenerApplication.class, args);\n    }\n}\n",
+      "reason": "entry point"
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "content": "spring:\n  datasource:\n    url: ${DATABASE_URL:jdbc:h2:mem:shortener;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE}\n    username: ${DATABASE_USERNAME:sa}\n    password: ${DATABASE_PASSWORD:}\n  jpa:\n    open-in-view: false\n    hibernate:\n      ddl-auto: validate\napp:\n  base-url: ${APP_BASE_URL:http://localhost:8080}\nmanagement:\n  endpoints:\n    web:\n      exposure:\n        include: health,prometheus\n",
+      "reason": "configuration via environment"
+    }
+  ],
+  "notes": "Datasource defaults to in-memory H2; production values come from environment variables."
+}

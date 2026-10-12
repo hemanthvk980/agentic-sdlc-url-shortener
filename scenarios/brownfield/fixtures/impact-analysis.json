@@ -1,0 +1,18 @@
+{
+  "summary": "Add a batch create endpoint on the links API, reusing single-create validation.",
+  "impactedFiles": [
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+      "why": "new POST /api/v1/links/batch handler"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkValidator.java",
+      "why": "batch validation"
+    }
+  ],
+  "newFiles": [],
+  "impactedApis": [],
+  "dataFlowChanges": [],
+  "schemaChange": false,
+  "regressionRisks": []
+}

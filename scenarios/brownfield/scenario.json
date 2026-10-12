@@ -1,0 +1,47 @@
+{
+  "name": "brownfield",
+  "type": "brownfield",
+  "requirement": "Marketing needs to shorten many URLs at once from a spreadsheet. Add a batch endpoint to the existing URL shortener that accepts up to 50 URLs in one request. Either all links are created or none: a single invalid URL must reject the whole batch and tell the caller which entries were wrong.",
+  "constraints": "Existing codebase: url-shortener-service (Java 21, Spring Boot 3.5, Gradle Kotlin DSL, package io.github.hemanthvk980.shortener).\nFollow its conventions: layering api → service → repo → domain (enforced by ArchUnit), RFC 7807 errors via common.GlobalExceptionHandler,\nconfiguration via AppProperties. Only modify files under url-shortener-service/. Tests: JUnit 5 + MockMvc in the existing style.",
+  "seedPaths": [
+    "settings.gradle.kts",
+    "build.gradle.kts",
+    "gradle",
+    "gradlew",
+    "gradlew.bat",
+    "orchestrator-core",
+    "url-shortener-service"
+  ],
+  "allowedPaths": [
+    "url-shortener-service/"
+  ],
+  "verifyCommand": [
+    "./gradlew",
+    ":url-shortener-service:test",
+    "--no-daemon",
+    "-q"
+  ],
+  "offlineVerifyCommand": [
+    "sh",
+    "scenarios/common/offline-verify.sh",
+    "url-shortener-service/"
+  ],
+  "verifyTimeoutSeconds": 900,
+  "maxLlmCalls": 40,
+  "maxMinutes": 45,
+  "human": {
+    "approver": "hemanth",
+    "approvals": {
+      "design": [
+        "APPROVED: all-or-nothing is what marketing asked for; reuse of create() keeps behaviour identical"
+      ],
+      "review": [
+        "APPROVED: risk accepted for the internal marketing rollout; follow-up ticket SHORT-142 weights rate-limit tokens by batch size before public exposure"
+      ],
+      "release-readiness": [
+        "APPROVED: additive, backward-compatible API change; ship"
+      ]
+    },
+    "answers": {}
+  }
+}

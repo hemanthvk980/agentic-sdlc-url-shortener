@@ -1,0 +1,48 @@
+{
+  "area": "impl",
+  "tasks": [
+    "T2 Transactional createBatch with up-front validation",
+    "T1 Batch DTOs and controller endpoint"
+  ],
+  "files": [
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/LinkService.java",
+      "type": "MODIFY",
+      "lines": 179,
+      "reason": "createBatch (FR1-FR2, NFR1)"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/service/BatchValidationException.java",
+      "type": "ADD",
+      "lines": 19,
+      "reason": "per-index errors"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/common/GlobalExceptionHandler.java",
+      "type": "MODIFY",
+      "lines": 97,
+      "reason": "400 problem with errors map"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateRequest.java",
+      "type": "ADD",
+      "lines": 10,
+      "reason": "1..50 entries, each validated like single create"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/BatchCreateResponse.java",
+      "type": "ADD",
+      "lines": 7,
+      "reason": "response DTO"
+    },
+    {
+      "path": "url-shortener-service/src/main/java/io/github/hemanthvk980/shortener/link/api/LinkController.java",
+      "type": "MODIFY",
+      "lines": 83,
+      "reason": "POST /api/v1/links/batch"
+    }
+  ],
+  "notes": [
+    "T2: createBatch reuses create() so single-create semantics are unchanged."
+  ]
+}
